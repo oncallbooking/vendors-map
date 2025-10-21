@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>India Vendor Map — Interactive</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <!-- MarkerCluster -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="sidebar">
+    <h1>Vendors — India Map</h1>
+    <input id="search" placeholder="Search vendor, city, state..." />
+    <div id="categoryTree" class="panel"></div>
+
+    <div class="panel">
+      <h3>Display</h3>
+      <label><input type="radio" name="displayMode" value="points" checked> Points (markers)</label><br>
+      <label><input type="radio" name="displayMode" value="choropleth"> Choropleth (by state counts)</label>
+    </div>
+
+    <div class="panel">
+      <button id="fitAll">Zoom to all markers</button>
+      <button id="downloadJson">Download vendors.json</button>
+    </div>
+
+    <div id="notes" class="panel small">
+      <strong>Notes:</strong>
+      <ul>
+        <li>This loads <code>vendors.json</code> from the same folder.</li>
+        <li>Rows without lat/lon will be geocoded by city,state (best-effort).</li>
+      </ul>
+    </div>
+  </div>
+
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
