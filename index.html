@@ -1,154 +1,56 @@
-
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Vendor Dashboard</title>
-<!-- DataTables CSS -->
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
-<!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<!-- jQuery -->
-<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-<!-- DataTables JS -->
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-<!-- SheetJS -->
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-
-<style>
-  body { font-family: Arial, sans-serif; margin: 20px; background-color: #f0f4f8; }
-  h1 { text-align: center; margin-bottom: 20px; color: #1f4e79; }
-  .chart-container { width: 90%; margin: auto; margin-bottom: 40px; }
-  table.dataTable { width: 100% !important; margin-bottom: 40px; }
-  input[type="file"] { display: block; margin: 20px auto; }
-</style>
+  <meta charset="utf-8" />
+  <title>India Vendors Map</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <!-- MarkerCluster CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <div id="sidebar">
+    <div class="header">
+      <h1>India Vendors Map</h1>
+      <div class="controls">
+        <input id="search" placeholder="Search vendor, city or state..." />
+        <button id="exportCsv">Export CSV</button>
+      </div>
+    </div>
 
-<h1>Vendor Insights Dashboard</h1>
+    <section>
+      <h2>Categories</h2>
+      <div id="categoryTree" class="tree"></div>
+    </section>
 
-<input type="file" id="excelFile" accept=".xlsx, .xls" />
+    <section>
+      <h2>Legend</h2>
+      <div id="legendItems"></div>
+    </section>
 
-<div class="chart-container">
-  <canvas id="vendorChart"></canvas>
-</div>
+    <section class="note">
+      <p>Tip: Click a marker to view the vendor profile. Use filters to limit visible markers.</p>
+    </section>
+  </div>
 
-<h2>Vendor Details Table</h2>
-<table id="vendorTable" class="display">
-  <thead>
-    <tr>
-      <th>SN</th>
-      <th>Item</th>
-      <th>Approved Vendors</th>
-      <th>Approved Capacity</th>
-      <th>Developmental Vendors</th>
-      <th>Developmental Capacity</th>
-      <th>Total Vendors</th>
-      <th>Total Capacity</th>
-    </tr>
-  </thead>
-  <tbody>
-    <!-- Data will be loaded dynamically from Excel -->
-  </tbody>
-</table>
+  <div id="map"></div>
 
-<script>
-let vendorChart;
+  <!-- Modal for full profile -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-content">
+      <button id="closeModal" class="close">&times;</button>
+      <div id="modalBody"></div>
+    </div>
+  </div>
 
-document.getElementById('excelFile').addEventListener('change', function(e) {
-  const file = e.target.files[0];
-  if (!file) return;
+  <!-- JS libs -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const data = new Uint8Array(e.target.result);
-    const workbook = XLSX.read(data, { type: 'array' });
-    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-    const jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
-
-    // Clear table
-    $('#vendorTable').DataTable().clear().destroy();
-    const tbody = $('#vendorTable tbody');
-    tbody.empty();
-
-    const chartLabels = [];
-    const totalVendorsData = [];
-    const totalCapacityData = [];
-
-    jsonData.forEach(row => {
-      tbody.append(`<tr style="background-color: ${Math.random() < 0.5 ? '#e6f7ff' : '#fff0f6'}">
-        <td>${row.SN}</td>
-        <td>${row.Item}</td>
-        <td>${row['Approved Vendors']}</td>
-        <td>${row['Approved Capacity']}</td>
-        <td>${row['Developmental Vendors']}</td>
-        <td>${row['Developmental Capacity']}</td>
-        <td>${row['Total Vendors']}</td>
-        <td>${row['Total Capacity']}</td>
-      </tr>`);
-
-      chartLabels.push(row.Item);
-      totalVendorsData.push(row['Total Vendors']);
-      totalCapacityData.push(row['Total Capacity']);
-    });
-
-    // Initialize DataTable
-    $('#vendorTable').DataTable({
-      paging: true,
-      searching: true,
-      ordering: true
-    });
-
-    // Destroy previous chart if exists
-    if (vendorChart) vendorChart.destroy();
-
-    const ctx = document.getElementById('vendorChart').getContext('2d');
-    vendorChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: chartLabels,
-        datasets: [
-          {
-            label: 'Total Vendors',
-            data: totalVendorsData,
-            backgroundColor: 'rgba(54, 162, 235, 0.7)',
-            borderColor: 'rgba(54, 162, 235, 1)',
-            borderWidth: 1
-          },
-          {
-            label: 'Total Capacity',
-            data: totalCapacityData,
-            backgroundColor: 'rgba(255, 99, 132, 0.5)',
-            borderColor: 'rgba(255, 99, 132, 1)',
-            type: 'line',
-            yAxisID: 'y1'
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        scales: {
-          y: {
-            beginAtZero: true,
-            title: { display: true, text: 'Vendors' }
-          },
-          y1: {
-            beginAtZero: true,
-            position: 'right',
-            title: { display: true, text: 'Capacity' },
-            grid: { drawOnChartArea: false }
-          }
-        },
-        plugins: {
-          tooltip: { mode: 'index', intersect: false }
-        }
-      }
-    });
-  };
-  reader.readAsArrayBuffer(file);
-});
-</script>
-
+  <!-- App script -->
+  <script src="script.js"></script>
 </body>
 </html>
