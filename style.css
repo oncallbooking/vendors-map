@@ -1,31 +1,198 @@
+/* style.css — modern, responsive styling for Sachida's RDSO Vendor Dashboard */
+/* Updated for GitHub deployment with extended chart types and info modal */
+
+:root {
+  --accent: #4f46e5; /* indigo */
+  --accent-light: rgba(79,70,229,0.08);
+  --muted: #6b7280;
+  --card-bg: #ffffff;
+  --shadow: 0 6px 18px rgba(15,23,42,0.06);
+  --radius: 12px;
+  --success: #16a34a;
+  --warning: #f59e0b;
+  --danger: #dc2626;
+}
+
+html, body, #app-root {
+  height: 100%;
+  background: #f8fafc;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  color: #0f172a;
+  margin: 0;
+}
+
 /* layout */
-html,body { height:100%; margin:0; font-family:Inter,Segoe UI,Roboto,Arial; }
-#map { position:absolute; top:0; right:0; bottom:0; left:320px; }
-#sidebar { position:absolute; left:0; top:0; bottom:0; width:320px; background:#fff; border-right:1px solid #e6e6e6; padding:16px; box-sizing:border-box; overflow:auto; }
-.header { display:flex; flex-direction:column; gap:8px; margin-bottom:8px; }
-.header h1 { margin:0; font-size:18px; }
-.controls { display:flex; gap:8px; }
-#search { flex:1; padding:8px; border:1px solid #ddd; border-radius:6px; }
-#exportCsv { padding:8px 10px; border-radius:6px; border:1px solid #ccc; background:#f7f7f7; cursor:pointer; }
-.tree { margin-top:8px; }
-.tree .cat { margin-bottom:8px; }
-.tree ul { margin:6px 0 0 18px; padding:0; list-style: disc; }
-.legend-item { display:flex; align-items:center; gap:8px; padding:4px 0; }
-.color-box { width:18px; height:18px; border-radius:4px; border:1px solid #ccc; display:inline-block; }
+#app-root { 
+  display: flex; 
+  min-height: 100vh; 
+}
+#sidebar {
+  width: 280px;
+  min-width: 220px;
+  max-width: 320px;
+  box-shadow: var(--shadow);
+  background: var(--card-bg);
+  overflow: auto;
+}
+#sidebar .btn { border-radius: 10px; }
+main { overflow: auto; }
 
-/* popup card styling uses Leaflet override */
-.leaflet-popup-content-wrapper { border-radius:8px; }
-.popup-card h3 { margin:0 0 6px 0; font-size:16px; }
-.popup-card p { margin:4px 0; font-size:13px; }
+/* cards */
+.card { 
+  border: 0; 
+  border-radius: var(--radius); 
+  box-shadow: var(--shadow); 
+  background: var(--card-bg); 
+}
+.card-header { 
+  background: linear-gradient(90deg, rgba(79,70,229,0.05), rgba(79,70,229,0.02)); 
+  border-bottom: 0; 
+}
 
-/* modal */
-.modal { position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:9999; }
-.modal.hidden { display:none; }
-.modal-content { background:#fff; width:min(900px,95%); max-height:90vh; overflow:auto; border-radius:8px; padding:18px; position:relative; box-shadow:0 10px 30px rgba(0,0,0,0.2); }
-.close { position:absolute; right:12px; top:12px; border:none; background:transparent; font-size:22px; cursor:pointer; }
+/* drop zone modal */
+#dropZone {
+  background: linear-gradient(180deg, rgba(79,70,229,0.02), transparent);
+  border: 2px dashed rgba(99,102,241,0.18);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+#dropZone.dragover { 
+  background: rgba(79,70,229,0.05); 
+  border-color: rgba(79,70,229,0.36); 
+}
 
-/* responsive */
-@media (max-width:900px){
-  #sidebar{ left:0; top:auto; width:100%; height:auto; position:relative; border-right:none; border-bottom:1px solid #eee; }
-  #map{ left:0; top: (/* fallback */) 240px; }
+/* chart control section */
+#excel-visualizer .card label.form-label {
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+#chartTypeSelect option[value*="placeholder"] {
+  color: var(--warning);
+}
+#chartTypeSelect option[value*="placeholder"]:before {
+  content: "⚠️ ";
+}
+
+/* success/danger message colors */
+.text-success { color: var(--success) !important; }
+.text-danger { color: var(--danger) !important; }
+
+/* map styling */
+.leaflet-container { border-radius: 8px; }
+
+/* table areas */
+#previewTableContainer table,
+#dataTableContainer table {
+  font-size: 0.85rem;
+  width: 100%;
+  border-collapse: collapse;
+}
+#dataTableContainer th, #dataTableContainer td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #eef2ff;
+}
+#dataTableContainer th {
+  background: rgba(79,70,229,0.03);
+  font-weight: 600;
+}
+
+/* modal styles */
+.modal-content {
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.modal-header {
+  background: var(--accent-light);
+  border-bottom: 1px solid rgba(79,70,229,0.1);
+}
+.modal-title {
+  color: var(--accent);
+  font-weight: 600;
+}
+#chartInfoBody {
+  color: #1e293b;
+  font-size: 0.9rem;
+}
+#chartInfoBody p em {
+  color: var(--muted);
+}
+#chartInfoDocs {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+#chartInfoDocs:hover {
+  background: #4338ca;
+  border-color: #4338ca;
+}
+
+/* responsive canvas */
+canvas { 
+  max-width: 100% !important; 
+  height: auto !important;
+}
+
+/* preview table wrapper */
+#previewTableWrapper h6 {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* placeholder highlight for unsupported charts */
+.placeholder-warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--warning);
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px dashed rgba(245, 158, 11, 0.3);
+}
+
+/* small screens */
+@media (max-width: 992px) {
+  #sidebar {
+    position: fixed;
+    z-index: 1030;
+    height: 100vh;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+  }
+  #sidebar.open { transform: translateX(0); }
+  main { margin-left: 0; padding: 1rem; }
+}
+
+/* button & input focus */
+button:focus, input:focus, select:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(79,70,229,0.12);
+}
+
+/* tooltip */
+[data-bs-toggle="tooltip"] {
+  cursor: help;
+}
+
+/* subtle hover for table rows */
+table tbody tr:hover {
+  background: rgba(79,70,229,0.03);
+}
+
+/* info modal link text */
+#chartInfoBody a {
+  color: var(--accent);
+  text-decoration: none;
+}
+#chartInfoBody a:hover {
+  text-decoration: underline;
+}
+
+/* mobile spacing */
+@media (max-width: 600px) {
+  #chartTypeSelect, #sheetSelect, #topN {
+    font-size: 0.85rem;
+  }
+  #refreshCharts, #downloadChartBtn {
+    font-size: 0.8rem;
+    padding: 0.35rem 0.5rem;
+  }
 }
