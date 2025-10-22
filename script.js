@@ -1,273 +1,390 @@
-/* Main script: loads vendors.json and creates interactive leaflet map
-   Features:
-   - Marker clustering
-   - Category/subcategory hierarchical filtering
-   - Search (name/city/state)
-   - Popup with profile + modal for full profile
-   - CSV export of currently visible vendors
-*/
+/**
+ * script.js — updated to support area, stackedBar, horizontalBar charts and a Chart Info modal for placeholders
+ *
+ * Keep the rest of your original functionality (upload, SheetJS parsing, Leaflet map, filters).
+ */
 
-const DATA_FILE = 'vendors.json'; // replace with your file if different
+/* =========================
+   Globals & Helpers
+   ========================= */
+let workbook = null;
+let currentSheetName = null;
+let currentData = []; // array of row objects
+let originalData = []; // copy as loaded
+let detectedMeta = { headers: [], numeric: [], categorical: [] };
+let mainChart = null;
+let mapInstance = null;
+let mapMarkersLayer = null;
+let lastChartType = 'auto';
 
-let map, markerCluster, allMarkers = [], categoryLayers = {}, vendorsData = [];
+// DOM elements
+const openUploadBtn = document.getElementById('openUploadBtn');
+const uploadModal = new bootstrap.Modal(document.getElementById('uploadModal'));
+const chartInfoModalEl = document.getElementById('chartInfoModal');
+const chartInfoModal = new bootstrap.Modal(chartInfoModalEl);
+const chartInfoBody = document.getElementById('chartInfoBody');
+const chartInfoDocs = document.getElementById('chartInfoDocs');
 
-function init() {
-  map = L.map('map').setView([22.0, 80.0], 5);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(map);
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const chooseFileBtn = document.getElementById('chooseFileBtn');
+const loadFileBtn = document.getElementById('loadFileBtn');
+const sheetSelect = document.getElementById('sheetSelect');
+const sheetList = document.getElementById('sheetList');
+const sheetPreview = document.getElementById('sheetPreview');
+const uploadErrors = document.getElementById('uploadErrors');
+const chartTypeSelect = document.getElementById('chartTypeSelect');
+const refreshChartsBtn = document.getElementById('refreshCharts');
+const topNInput = document.getElementById('topN');
+const previewTableWrapper = document.getElementById('previewTableWrapper');
+const previewTableContainer = document.getElementById('previewTableContainer');
+const mainChartCanvas = document.getElementById('mainChart');
+const downloadChartBtn = document.getElementById('downloadChartBtn');
+const tableSearch = document.getElementById('tableSearch');
+const dataTableContainer = document.getElementById('dataTableContainer');
+const exportCsvBtn = document.getElementById('exportCsvBtn');
+const downloadDataBtn = document.getElementById('downloadDataBtn');
+const printDashboardBtn = document.getElementById('printDashboardBtn');
+const mapStatus = document.getElementById('mapStatus');
+const mapEl = document.getElementById('map');
+const filterControls = document.getElementById('filterControls');
 
-  markerCluster = L.markerClusterGroup();
-  map.addLayer(markerCluster);
+// init
+document.addEventListener('DOMContentLoaded', () => {
+  initMap();
+  wireUi();
+  tryReloadFromLocal();
+});
 
-  fetch(DATA_FILE)
-    .then(r => r.json())
-    .then(data => {
-      vendorsData = data;
-      buildFromData(data);
-    })
-    .catch(err => {
-      console.error('Failed to load vendors.json', err);
-      alert('Could not load vendor data. Check vendors.json is present.');
+/* =========================
+   UI wiring
+   ========================= */
+function wireUi() {
+  openUploadBtn.addEventListener('click', () => {
+    uploadErrors.style.display = 'none';
+    fileInput.value = '';
+    sheetSelect.innerHTML = '';
+    sheetPreview.style.display = 'none';
+    loadFileBtn.disabled = true;
+    uploadModal.show();
+  });
+
+  chooseFileBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', handleFileChosen);
+
+  ;['dragenter','dragover'].forEach(ev => {
+    dropZone.addEventListener(ev, e => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.add('dragover');
     });
-
-  setupUIHandlers();
-}
-
-function buildFromData(vendors) {
-  // Build categories
-  const categories = {};
-  vendors.forEach(v => {
-    const cat = (v.category || 'Uncategorized').toString();
-    const sub = (v.subcategory || '').toString();
-    if (!categories[cat]) categories[cat] = {};
-    if (sub) {
-      categories[cat][sub] = categories[cat][sub] || [];
-    } else {
-      categories[cat]._list = categories[cat]._list || [];
-    }
-    // push placeholder - actual marker association happens later
+  });
+  ;['dragleave','drop'].forEach(ev => {
+    dropZone.addEventListener(ev, e => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.remove('dragover');
+    });
   });
 
-  buildCategoryTree(categories);
+  dropZone.addEventListener('drop', e => {
+    const files = (e.dataTransfer && e.dataTransfer.files) || [];
+    if (files.length) {
+      fileInput.files = files;
+      handleFileChosen();
+    }
+  });
 
-  // Add markers
-  vendors.forEach((v, idx) => {
-    const lat = parseFloat(v.latitude);
-    const lon = parseFloat(v.longitude);
-    if (Number.isFinite(lat) && Number.isFinite(lon)) {
-      const marker = L.marker([lat, lon]);
-      marker.vendor = v;
-      marker.bindPopup(buildPopupHtml(v), { maxWidth: 420 });
-      marker.on('popupopen', () => {
-        // optional: highlight or track
+  loadFileBtn.addEventListener('click', () => {
+    if (!workbook) return showUploadError('No file loaded.');
+    populateSheetSelect();
+    uploadModal.hide();
+    const firstSheet = sheetSelect.querySelector('option')?.value;
+    if (firstSheet) {
+      sheetSelect.value = firstSheet;
+      loadSheetToVisualizer(firstSheet);
+    }
+  });
+
+  sheetSelect.addEventListener('change', () => {
+    const s = sheetSelect.value;
+    if (s) loadSheetToVisualizer(s);
+  });
+
+  refreshChartsBtn.addEventListener('click', () => {
+    if (!currentData.length) return alert('No data loaded');
+    renderCurrentChart();
+  });
+
+  chartTypeSelect.addEventListener('change', () => renderCurrentChart());
+  topNInput.addEventListener('change', () => renderCurrentChart());
+
+  downloadChartBtn.addEventListener('click', () => {
+    if (!mainChart) return;
+    const link = document.createElement('a');
+    link.download = `chart-${(new Date()).toISOString()}.png`;
+    link.href = mainChart.toBase64Image();
+    link.click();
+  });
+
+  tableSearch.addEventListener('input', () => renderDataTable());
+  exportCsvBtn.addEventListener('click', () => exportProcessedData());
+  downloadDataBtn.addEventListener('click', () => exportProcessedData());
+
+  printDashboardBtn.addEventListener('click', () => window.print());
+}
+
+/* =========================
+   File handling
+   ========================= */
+function handleFileChosen() {
+  uploadErrors.style.display = 'none';
+  const f = fileInput.files[0];
+  if (!f) return;
+  const name = f.name.toLowerCase();
+  if (!(/\.(xlsx|xls|csv)$/i.test(name))) {
+    return showUploadError('Only .xlsx, .xls, and .csv files are supported.');
+  }
+
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const data = ev.target.result;
+    try {
+      if (name.endsWith('.csv')) {
+        const text = data instanceof ArrayBuffer ? new TextDecoder().decode(data) : data;
+        const parsed = Papa.parse(text, { header: true, dynamicTyping: true });
+        const headers = Object.keys(parsed.data[0] || {});
+        const aoa = [headers].concat(parsed.data.map(r => headers.map(h => r[h])));
+        workbook = { Sheets: { Sheet1: XLSX.utils.aoa_to_sheet(aoa) }, SheetNames: ['Sheet1'] };
+      } else {
+        const arr = new Uint8Array(data);
+        workbook = XLSX.read(arr, { type: 'array' });
+      }
+
+      sheetPreview.style.display = 'block';
+      sheetList.innerHTML = '';
+      workbook.SheetNames.forEach((s,i) => {
+        const item = document.createElement('li');
+        item.className = 'list-group-item d-flex justify-content-between align-items-center';
+        item.textContent = s;
+        const badge = document.createElement('span');
+        badge.className = 'badge bg-primary rounded-pill';
+        badge.textContent = 'Sheet ' + (i+1);
+        item.appendChild(badge);
+        sheetList.appendChild(item);
       });
-      markerCluster.addLayer(marker);
-      allMarkers.push(marker);
-
-      // category index
-      const cat = v.category || 'Uncategorized';
-      if (!categoryLayers[cat]) categoryLayers[cat] = [];
-      categoryLayers[cat].push(marker);
+      loadFileBtn.disabled = false;
+      populateSheetSelect();
+      showUploadMessage('File loaded. Choose sheet to view.');
+    } catch (err) {
+      console.error(err);
+      showUploadError('Failed to parse file. Make sure file is valid and not corrupted.');
     }
+  };
+
+  if (name.endsWith('.csv')) reader.readAsText(f); else reader.readAsArrayBuffer(f);
+}
+
+function showUploadError(msg) {
+  uploadErrors.style.display = 'block';
+  uploadErrors.classList.remove('text-success');
+  uploadErrors.classList.add('text-danger');
+  uploadErrors.textContent = msg;
+}
+
+function showUploadMessage(msg) {
+  uploadErrors.style.display = 'block';
+  uploadErrors.classList.remove('text-danger');
+  uploadErrors.classList.add('text-success');
+  uploadErrors.textContent = msg;
+  setTimeout(() => {
+    uploadErrors.style.display = 'none';
+    uploadErrors.classList.remove('text-success');
+    uploadErrors.classList.add('text-danger');
+  }, 2500);
+}
+
+function populateSheetSelect() {
+  if (!workbook) return;
+  sheetSelect.innerHTML = '';
+  workbook.SheetNames.forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    sheetSelect.appendChild(opt);
   });
-
-  buildLegend(Object.keys(categories));
+  sheetSelect.disabled = false;
 }
 
-function buildPopupHtml(v){
-  const p = v.profile || {};
-  let html = '<div class="popup-card">';
-  html += `<h3>${escapeHtml(v.name || 'Unnamed')}</h3>`;
-  html += `<p><strong>Category:</strong> ${escapeHtml(v.category || '')}${v.subcategory ? ' → ' + escapeHtml(v.subcategory) : ''}</p>`;
-  html += `<p><strong>Location:</strong> ${escapeHtml(v.city || '')}, ${escapeHtml(v.state || '')}</p>`;
-  if (p.owner) html += `<p><strong>Owner:</strong> ${escapeHtml(p.owner)}</p>`;
-  const phone = p.phone || p.contact || p.mobile;
-  if (phone) html += `<p><strong>Phone:</strong> ${escapeHtml(phone)}</p>`;
-  if (p.email) html += `<p><strong>Email:</strong> <a href="mailto:${escapeHtml(p.email)}">${escapeHtml(p.email)}</a></p>`;
-  if (p.website) html += `<p><strong>Website:</strong> <a target="_blank" href="${escapeHtml(p.website)}">${escapeHtml(p.website)}</a></p>`;
-  html += `<p><button onclick="openProfileModal(${JSON.stringify(escapeHtml(JSON.stringify(v))).replace(/"/g,'&quot;')})">View Full Profile</button></p>`;
-  html += '</div>';
-  return html;
-}
-
-// Modal: we pass a JSON string encoded above, decode it here and render nicely
-function openProfileModal(encodedJson) {
+/* =========================
+   Load sheet into visualizer
+   ========================= */
+function loadSheetToVisualizer(sheetName) {
+  if (!workbook || !workbook.Sheets[sheetName]) return;
+  currentSheetName = sheetName;
   try {
-    const jsonStr = decodeHtml(encodedJson);
-    const vendor = JSON.parse(jsonStr);
-    const part = renderFullProfile(vendor);
-    document.getElementById('modalBody').innerHTML = part;
-    document.getElementById('modal').classList.remove('hidden');
-  } catch (e) { console.error(e); }
-}
-function closeProfileModal(){ document.getElementById('modal').classList.add('hidden'); }
-
-// Render full profile HTML
-function renderFullProfile(v) {
-  const p = v.profile || {};
-  let html = `<h2>${escapeHtml(v.name)}</h2>`;
-  html += `<p><strong>Category:</strong> ${escapeHtml(v.category || '')}${v.subcategory ? ' → ' + escapeHtml(v.subcategory) : ''}</p>`;
-  html += `<p><strong>Location:</strong> ${escapeHtml(v.city || '')}, ${escapeHtml(v.state || '')}</p>`;
-  html += `<hr/>`;
-  if (p.owner) html += `<p><strong>Owner:</strong> ${escapeHtml(p.owner)}</p>`;
-  if (p.phone) html += `<p><strong>Phone:</strong> ${escapeHtml(p.phone)}</p>`;
-  if (p.email) html += `<p><strong>Email:</strong> <a href="mailto:${escapeHtml(p.email)}">${escapeHtml(p.email)}</a></p>`;
-  if (p.website) html += `<p><strong>Website:</strong> <a href="${escapeHtml(p.website)}" target="_blank">${escapeHtml(p.website)}</a></p>`;
-  if (p.address) html += `<p><strong>Address:</strong> ${escapeHtml(p.address)}</p>`;
-  if (p.description) html += `<p>${escapeHtml(p.description)}</p>`;
-  // Add custom fields
-  Object.keys(p).forEach(k => {
-    if (!['owner','phone','email','website','address','description'].includes(k)){
-      html += `<p><strong>${escapeHtml(k)}:</strong> ${escapeHtml(p[k])}</p>`;
-    }
-  });
-  return html;
-}
-
-function buildCategoryTree(categories) {
-  const container = document.getElementById('categoryTree');
-  container.innerHTML = '';
-  Object.keys(categories).sort().forEach(cat => {
-    const catDiv = document.createElement('div');
-    catDiv.className = 'cat';
-    const chk = document.createElement('input');
-    chk.type = 'checkbox';
-    chk.checked = true;
-    chk.id = 'cat_' + slug(cat);
-    chk.addEventListener('change', e => toggleCategory(cat, e.target.checked));
-    const lbl = document.createElement('label');
-    lbl.htmlFor = chk.id;
-    lbl.innerText = cat;
-    catDiv.appendChild(chk);
-    catDiv.appendChild(lbl);
-
-    const subs = Object.keys(categories[cat]).filter(k=>k!=='_list');
-    if (subs.length) {
-      const ul = document.createElement('ul');
-      subs.forEach(sub => {
-        const li = document.createElement('li');
-        const subChk = document.createElement('input');
-        subChk.type='checkbox';
-        subChk.checked = true;
-        subChk.id = 'sub_' + slug(cat) + '_' + slug(sub);
-        subChk.addEventListener('change', e => toggleSubcategory(cat, sub, e.target.checked));
-        const subLbl = document.createElement('label');
-        subLbl.htmlFor = subChk.id;
-        subLbl.innerText = sub;
-        li.appendChild(subChk);
-        li.appendChild(subLbl);
-        ul.appendChild(li);
-      });
-      catDiv.appendChild(ul);
-    }
-    container.appendChild(catDiv);
-  });
-}
-
-function toggleCategory(cat, visible) {
-  const markers = categoryLayers[cat] || [];
-  markers.forEach(m => {
-    if (visible) markerCluster.addLayer(m);
-    else markerCluster.removeLayer(m);
-  });
-}
-
-function toggleSubcategory(cat, sub, visible) {
-  allMarkers.forEach(m => {
-    if ((m.vendor.category || '') === cat && (m.vendor.subcategory || '') === sub) {
-      if (visible) markerCluster.addLayer(m);
-      else markerCluster.removeLayer(m);
-    }
-  });
-}
-
-function buildLegend(categories) {
-  const el = document.getElementById('legendItems');
-  el.innerHTML = '';
-  categories.slice(0, 12).forEach((c,i) => {
-    const div = document.createElement('div');
-    div.className = 'legend-item';
-    const colorBox = document.createElement('span');
-    colorBox.className = 'color-box';
-    colorBox.style.background = getColorForIndex(i);
-    const lbl = document.createElement('span');
-    lbl.innerText = c;
-    div.appendChild(colorBox);
-    div.appendChild(lbl);
-    el.appendChild(div);
-  });
-}
-
-function getColorForIndex(i) {
-  const palette = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd','#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf'];
-  return palette[i % palette.length];
-}
-
-// Search functionality
-function setupUIHandlers(){
-  document.getElementById('search').addEventListener('input', e => {
-    const q = e.target.value.trim().toLowerCase();
-    if (!q) {
-      // reset: show all markers present in markerCluster (respecting category toggles)
-      markerCluster.clearLayers();
-      allMarkers.forEach(m => {
-        // show only if its category checkbox is checked
-        const cat = m.vendor.category || 'Uncategorized';
-        const catCheckbox = document.getElementById('cat_' + slug(cat));
-        if (!catCheckbox || catCheckbox.checked) markerCluster.addLayer(m);
-      });
+    const ws = workbook.Sheets[sheetName];
+    const json = XLSX.utils.sheet_to_json(ws, { defval: null });
+    if (!json || !json.length) {
+      alert('Sheet is empty or no rows found.');
       return;
     }
-    // filter by query
-    markerCluster.clearLayers();
-    allMarkers.forEach(m => {
-      const v = m.vendor;
-      const hay = ((v.name||'') + ' ' + (v.city||'') + ' ' + (v.state||'') + ' ' + (v.category||'') + ' ' + (v.subcategory||'')).toLowerCase();
-      if (hay.includes(q)) markerCluster.addLayer(m);
-    });
-  });
-
-  document.getElementById('closeModal').addEventListener('click', closeProfileModal);
-  document.getElementById('modal').addEventListener('click', (ev) => {
-    if (ev.target.id === 'modal') closeProfileModal();
-  });
-
-  document.getElementById('exportCsv').addEventListener('click', () => {
-    exportVisibleToCSV();
-  });
+    originalData = json.map(r => ({...r}));
+    currentData = originalData.slice();
+    detectColumns(currentData);
+    renderDataTable();
+    renderFilters();
+    renderCurrentChart();
+    attemptMapPlot(currentData);
+    exportCsvBtn.disabled = false;
+    downloadDataBtn.disabled = false;
+    try {
+      const mini = { sheet: sheetName, preview: currentData.slice(0,200) };
+      localStorage.setItem('lastDatasetPreview', JSON.stringify(mini));
+    } catch(e){ }
+  } catch (err) {
+    console.error(err);
+    alert('Failed to load sheet to visualizer: ' + err.message);
+  }
 }
 
-function exportVisibleToCSV() {
-  // Extract vendor data from markers currently in markerCluster
-  const items = [];
-  markerCluster.eachLayer(layer => {
-    if (layer.vendor) items.push(layer.vendor);
+/* =========================
+   Column detection & meta
+   ========================= */
+function detectColumns(data) {
+  const headers = Object.keys(data[0] || {});
+  const numeric = [];
+  const categorical = [];
+
+  headers.forEach(h => {
+    let numericCount = 0, totalCount = 0;
+    for (let i=0;i<data.length && i<200;i++){
+      const v = data[i][h];
+      if (v === null || v === undefined || v === '') { totalCount++; continue; }
+      totalCount++;
+      if (typeof v === 'number' && !isNaN(v)) numericCount++;
+      else if ( !isNaN(parseFloat(v)) && isFinite(v) ) numericCount++;
+    }
+    if (totalCount>0 && numericCount/totalCount > 0.6) numeric.push(h);
+    else categorical.push(h);
   });
-  if (items.length === 0) { alert('No visible vendors to export.'); return; }
-  const cols = ['name','category','subcategory','city','state','latitude','longitude','owner','phone','email','website','address','description'];
-  const rows = items.map(v => {
-    const p = v.profile || {};
-    return cols.map(c => {
-      if (['owner','phone','email','website','address','description'].includes(c)) return escapeCsv((p[c] || ''));
-      return escapeCsv(v[c] || '');
-    }).join(',');
-  });
-  const csv = [cols.join(',')].concat(rows).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'vendors_export.csv';
-  a.click();
-  URL.revokeObjectURL(url);
+
+  detectedMeta.headers = headers;
+  detectedMeta.numeric = numeric;
+  detectedMeta.categorical = categorical;
 }
 
-function escapeCsv(s){ if (s === null || s === undefined) return ''; return '"' + String(s).replace(/"/g,'""') + '"'; }
+/* =========================
+   Rendering charts
+   ========================= */
+function renderCurrentChart() {
+  if (!currentData.length) return;
+  const selected = chartTypeSelect.value;
+  const chartType = selected === 'auto' ? autoSuggestChart() : selected;
+  // if placeholder (unsupported) -> show info modal
+  const placeholders = ['histogram','boxplot','violin','heatmap','treemap','sankey','sunburst','funnel','gauge','candlestick','choropleth'];
+  if (placeholders.includes(chartType)) {
+    showChartInfo(chartType);
+    // fallback to table preview so UI doesn't break
+    chartTypeSelect.value = chartType; // keep selected
+    previewTableWrapper.style.display = 'block';
+    renderPreviewTable();
+    if (mainChart) { try { mainChart.destroy(); } catch(e){} mainChart = null; downloadChartBtn.disabled = true; }
+    return;
+  }
 
-function slug(s) { return (s || '').toString().toLowerCase().replace(/\s+/g,'_').replace(/[^\w\-]/g,''); }
-function escapeHtml(s){ if (s === null || s === undefined) return ''; return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
-function decodeHtml(encoded){ const txt = document.createElement('textarea'); txt.innerHTML = encoded; return txt.value; }
+  lastChartType = chartType;
+  previewTableWrapper.style.display = chartType === 'table' ? 'block' : 'none';
+  if (chartType === 'table') {
+    renderPreviewTable();
+    if (mainChart) { mainChart.destroy(); mainChart = null; downloadChartBtn.disabled = true; }
+    return;
+  }
+  const ctx = mainChartCanvas.getContext('2d');
 
-// bootstrap
-window.onload = init;
+  // choose fields automatically
+  const { xField, yField, categoryField } = chooseFieldsForChart(chartType);
+
+  let chartConfig = null;
+  try {
+    if (chartType === 'pie') chartConfig = generatePieConfig(categoryField);
+    else if (chartType === 'doughnut') chartConfig = generatePieConfig(categoryField, true);
+    else if (chartType === 'bar') chartConfig = generateBarConfig(xField, yField);
+    else if (chartType === 'horizontalBar') chartConfig = generateHorizontalBarConfig(xField, yField);
+    else if (chartType === 'stackedBar') chartConfig = generateStackedBarConfig(xField, yField);
+    else if (chartType === 'line') chartConfig = generateLineConfig(xField, yField);
+    else if (chartType === 'area') chartConfig = generateAreaConfig(xField, yField);
+    else if (chartType === 'bubble') chartConfig = generateBubbleConfig();
+    else if (chartType === 'scatter') chartConfig = generateScatterConfig();
+    else if (chartType === 'radar') chartConfig = generateRadarConfig();
+    else if (chartType === 'polarArea') chartConfig = generatePolarAreaConfig(categoryField);
+    else throw new Error('Unsupported chart type: ' + chartType);
+  } catch (err) {
+    console.error(err);
+    alert('Failed to generate chart: ' + err.message);
+    return;
+  }
+
+  if (mainChart) { try { mainChart.destroy(); } catch(e){} }
+  mainChart = new Chart(ctx, chartConfig);
+  downloadChartBtn.disabled = false;
+}
+
+/* heuristics: choose fields */
+function chooseFieldsForChart(type) {
+  const numeric = detectedMeta.numeric;
+  const cat = detectedMeta.categorical;
+  let xField = null, yField = null, categoryField = null;
+
+  if (type === 'pie' || type === 'doughnut' || type === 'polarArea') {
+    categoryField = cat[0] || detectedMeta.headers[0];
+  } else if (type === 'bar' || type === 'stackedBar' || type === 'horizontalBar') {
+    categoryField = cat[0] || detectedMeta.headers[0];
+    yField = numeric[0] || detectedMeta.headers[1] || categoryField;
+    xField = categoryField;
+  } else if (type === 'line' || type === 'area') {
+    const dateLike = detectedMeta.headers.find(h => /date|time|month|year/i.test(h));
+    xField = dateLike || detectedMeta.headers[0];
+    yField = numeric[0] || detectedMeta.headers[1] || detectedMeta.headers[0];
+  } else if (type === 'bubble') {
+    xField = numeric[0] || detectedMeta.headers[0];
+    yField = numeric[1] || numeric[0] || detectedMeta.headers[1] || detectedMeta.headers[0];
+    categoryField = detectedMeta.headers.find(h => ![xField,yField].includes(h)) || detectedMeta.headers[0];
+  } else if (type === 'scatter') {
+    xField = numeric[0] || detectedMeta.headers[0];
+    yField = numeric[1] || numeric[0] || detectedMeta.headers[1] || detectedMeta.headers[0];
+  } else {
+    xField = detectedMeta.headers[0];
+    yField = detectedMeta.numeric[0] || detectedMeta.headers[1] || detectedMeta.headers[0];
+  }
+
+  return { xField, yField, categoryField };
+}
+
+/* Auto-suggest chart type */
+function autoSuggestChart() {
+  if (detectedMeta.categorical.length >= 1 && detectedMeta.numeric.length >= 1) return 'bar';
+  if (detectedMeta.numeric.length >= 2) return 'bubble';
+  if (detectedMeta.categorical.length >= 1 && detectedMeta.numeric.length === 0) return 'pie';
+  return 'table';
+}
+
+/* ===== Chart generators ===== */
+
+function generatePieConfig(categoryField, doughnut=false) {
+  const topN = Number(topNInput.value) || 10;
+  const counts = {};
+  currentData.forEach(r => {
+    const k = (r[categoryField] ?? 'Unknown') + '';
+    counts[k] = (counts[k] || 0) + 1;
+  });
+  const entries = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0, topN);
+  const labels = entries.map(e=>e[0]);
+  const values = entries.map(e=>e[1]);
+  return {
+    type: doughnut ? 'doughnut' : 'pie',
+    data: { labels, datasets: [{ data: values, label: categoryField }] },
+    options: {
+      responsive: true,
+      plugins: {
+        title: { display:true, text: `Di
