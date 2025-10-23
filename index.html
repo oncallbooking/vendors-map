@@ -1,518 +1,247 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>DataViz Pro — Dashboard</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Sachida's RDSO Vendor Dashboard — Excel Upload & Visualizer</title>
 
-  <!-- Libraries -->
+  <!-- Bootstrap (for quick layout & modal) -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
-  <link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 
-  <style>
-    :root{
-      --card-bg:#ffffff;
-      --muted:#6c757d;
-      --accent:#2563eb;
-      --radius:12px;
-      --shadow: 0 6px 20px rgba(16,24,40,0.06);
-      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-    }
-    body{background:#f5f7fb; color:#0f172a; margin:0; font-size:14px;}
-    .dashboard-wrapper{display:flex; min-height:100vh;}
-    aside.sidebar{width:260px; background:#0b1220; color:#fff; padding:18px; box-shadow: 4px 0 20px rgba(2,6,23,0.06);}
-    .sidebar .logo-text h1{font-size:20px; margin:0; letter-spacing:0.2px;}
-    .sidebar .logo-text p{font-size:12px; margin:0; opacity:.8;}
-    main.main-content{flex:1; padding:20px 28px;}
-    .content-header{display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px;}
-    .content-header h2{margin:0; font-weight:600;}
-    .filters-bar{background:var(--card-bg); padding:14px; border-radius:var(--radius); box-shadow:var(--shadow); display:flex; gap:12px; align-items:center; flex-wrap:wrap;}
-    .filter-dropdown{min-width:220px;}
-    .multi-select-menu{max-height:220px; overflow:auto; padding:8px;}
-    .filter-actions{margin-left:auto; display:flex; gap:8px; align-items:center;}
-    .viz-row{display:flex; gap:18px; margin-top:18px; align-items:flex-start;}
-    .viz-col{flex:1; background:var(--card-bg); border-radius:12px; padding:12px; box-shadow:var(--shadow);}
-    .chart-header, .map-header{display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;}
-    .chart-actions .btn, .map-actions .btn{margin-left:6px;}
-    canvas#mainChart{max-height:420px; width:100% !important;}
-    #map{height:420px; border-radius:10px;}
-    .table-section{margin-top:18px; background:var(--card-bg); padding:12px; border-radius:12px; box-shadow:var(--shadow);}
-    .table-wrapper{max-height:320px; overflow:auto; border-radius:8px;}
-    table.table thead th{position:sticky; top:0; background:#fff; z-index:2; border-bottom:1px solid #e6e9ef;}
-    .compact-table td, .compact-table th{padding:.45rem .6rem; vertical-align:middle;}
-    .badge-status{font-size:12px; padding:.35em .6em; border-radius:999px; background:#eef2ff; color:var(--accent);}
-    /* dropdown checkbox style */
-    .dropdown-item input[type="checkbox"]{margin-right:8px;}
-    /* small adjustments */
-    .control-small{height:38px; padding:.375rem .6rem;}
-    @media(max-width:992px){
-      .viz-row{flex-direction:column;}
-      aside.sidebar{display:none;}
-    }
-  </style>
+  <!-- Leaflet (map) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
+
+  <!-- SheetJS -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+  <!-- PapaParse (optional CSV parsing) -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- small helper icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 </head>
 <body>
-  <div class="dashboard-wrapper">
-    <!-- Sidebar (kept simple) -->
-    <aside class="sidebar">
-      <div class="mb-3 d-flex align-items-center gap-2">
-        <div class="rounded-circle bg-white text-dark d-flex align-items-center justify-content-center" style="width:44px;height:44px;">
-          <i class="fas fa-chart-line"></i>
+  <div class="d-flex" id="app-root">
+    <!-- Sidebar -->
+    <nav id="sidebar" class="bg-white border-end">
+      <div class="p-3">
+        <h4 class="mb-3">Sachida's RDSO Vendor Dashboard</h4>
+        <div class="mb-3">
+          <button id="openUploadBtn" class="btn btn-primary w-100">📊 Upload Excel Data</button>
         </div>
+
+        <!-- Filters -->
+        <div id="filters" class="mt-3">
+          <h6>Filters</h6>
+          <div id="filterControls" class="small text-muted">
+            <!-- dynamically populated -->
+            <p class="text-muted">Upload data to see filters.</p>
+          </div>
+        </div>
+
+        <hr />
+
         <div>
-          <h1 style="font-size:16px;margin:0">DataViz Pro</h1>
-          <small style="opacity:.85">Enterprise Analytics</small>
+          <button id="downloadDataBtn" class="btn btn-outline-secondary w-100 mb-2" disabled>⬇️ Download Processed Data</button>
+          <button id="printDashboardBtn" class="btn btn-outline-secondary w-100 mb-2">🖨️ Print Dashboard</button>
+        </div>
+
+        <div class="mt-4 text-muted small">
+          <p><strong>Tip:</strong> Drag & drop an .xlsx or .csv file when modal opens.</p>
         </div>
       </div>
+    </nav>
 
-      <div class="mt-4">
-        <button id="uploadBtn" class="btn btn-sm btn-outline-light w-100 mb-2"><i class="fas fa-upload me-2"></i> Upload Data</button>
-        <button id="resetBtn" class="btn btn-sm btn-outline-light w-100 mb-2"><i class="fas fa-eraser me-2"></i> Reset Demo</button>
-      </div>
-
-      <hr style="border-color:rgba(255,255,255,0.06)">
-      <div class="text-white-50">
-        <h6 class="mb-1">Dataset Overview</h6>
-        <div class="d-flex gap-3">
-          <div>
-            <div style="font-size:18px;font-weight:600" id="rowCount">0</div>
-            <small class="text-muted">Rows</small>
-          </div>
-          <div>
-            <div style="font-size:18px;font-weight:600" id="colCount">0</div>
-            <small class="text-muted">Cols</small>
+    <!-- Main content -->
+    <main class="flex-grow-1 p-3">
+      <!-- Top: vendor insights (existing) -->
+      <section id="vendor-insights" class="mb-4">
+        <h3>Vendor Insights</h3>
+        <div class="card mb-3">
+          <div class="card-body">
+            <!-- Existing vendor dashboard content should remain here; we've left a placeholder -->
+            <p class="mb-0 text-muted">Existing vendor charts and map live above the new Excel visualizer. (Placeholder content — your existing vendor widgets will remain functional.)</p>
           </div>
         </div>
-      </div>
-    </aside>
+      </section>
 
-    <!-- Main -->
-    <main class="main-content">
-      <div class="content-header">
-        <div>
-          <h2>Analytics Dashboard</h2>
-          <p class="text-muted mb-0">Filters on top — chart and map side-by-side. Click pins to view vendor portfolio.</p>
-        </div>
-        <div class="d-flex gap-2 align-items-center">
-          <div class="input-group">
-            <span class="input-group-text"><i class="fas fa-search"></i></span>
-            <input id="globalSearch" class="form-control control-small" placeholder="Global search..." />
-          </div>
-        </div>
-      </div>
-
-      <!-- Filters Bar (Top) -->
-      <div class="filters-bar" id="filtersBar">
-        <!-- Example multi-select dropdown: Vendor Type -->
-        <div class="dropdown filter-dropdown">
-          <button class="btn btn-outline-secondary dropdown-toggle control-small" type="button" id="ddVendorType" data-bs-toggle="dropdown" aria-expanded="false">
-            Vendor Type <small class="text-muted ms-2" id="vendorTypeCount">(All)</small>
-          </button>
-          <div class="dropdown-menu p-2 multi-select-menu" aria-labelledby="ddVendorType">
-            <div class="form-check">
-              <input class="form-check-input vendor-type-checkbox" type="checkbox" value="Retail" id="vtRetail" checked>
-              <label class="form-check-label" for="vtRetail">Retail</label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input vendor-type-checkbox" type="checkbox" value="Wholesale" id="vtWholesale" checked>
-              <label class="form-check-label" for="vtWholesale">Wholesale</label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input vendor-type-checkbox" type="checkbox" value="Services" id="vtServices" checked>
-              <label class="form-check-label" for="vtServices">Services</label>
-            </div>
-          </div>
-        </div>
-
-        <!-- Region multi-select -->
-        <div class="dropdown filter-dropdown">
-          <button class="btn btn-outline-secondary dropdown-toggle control-small" type="button" id="ddRegion" data-bs-toggle="dropdown" aria-expanded="false">
-            Region <small class="text-muted ms-2" id="regionCount">(All)</small>
-          </button>
-          <div class="dropdown-menu p-2 multi-select-menu" aria-labelledby="ddRegion">
-            <div class="form-check">
-              <input class="form-check-input region-checkbox" type="checkbox" value="North" id="rgNorth" checked>
-              <label class="form-check-label" for="rgNorth">North</label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input region-checkbox" type="checkbox" value="South" id="rgSouth" checked>
-              <label class="form-check-label" for="rgSouth">South</label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input region-checkbox" type="checkbox" value="West" id="rgWest" checked>
-              <label class="form-check-label" for="rgWest">West</label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input region-checkbox" type="checkbox" value="East" id="rgEast" checked>
-              <label class="form-check-label" for="rgEast">East</label>
-            </div>
-          </div>
-        </div>
-
-        <!-- Chart Type -->
-        <select id="chartType" class="form-select control-small" style="min-width:160px;">
-          <option value="bar">Bar (Top N)</option>
-          <option value="pie">Pie</option>
-          <option value="line">Line</option>
-        </select>
-
-        <!-- Top N -->
-        <input id="topN" type="number" min="1" value="10" class="form-control control-small" style="width:110px;" title="Top N (for bar/pie)" />
-
-        <div class="filter-actions">
-          <button id="applyFilters" class="btn btn-primary btn-sm"><i class="fas fa-check me-1"></i> Apply</button>
-          <button id="clearFilters" class="btn btn-outline-secondary btn-sm"><i class="fas fa-redo me-1"></i> Reset</button>
-        </div>
-      </div>
-
-      <!-- Chart & Map Row -->
-      <div class="viz-row">
-        <!-- Chart Column -->
-        <div class="viz-col" id="chartColumn" style="min-width:320px;">
-          <div class="chart-header">
-            <h5 id="chartTitle" class="mb-0">Main Chart</h5>
-            <div class="chart-actions">
-              <button id="chartFullscreen" class="btn btn-sm btn-outline-secondary" title="Fullscreen"><i class="fas fa-expand"></i></button>
-              <button id="downloadChartBtn" class="btn btn-sm btn-outline-primary" title="Download chart"><i class="fas fa-download"></i></button>
-            </div>
-          </div>
-          <div>
-            <canvas id="mainChart"></canvas>
-          </div>
-
-          <!-- optional preview table inside chart card -->
-          <div id="previewTableWrapper" class="mt-3" style="display:none;">
-            <h6 class="mb-2">Data preview</h6>
-            <div id="previewTableContainer" class="table-responsive small"></div>
-          </div>
-        </div>
-
-        <!-- Map Column -->
-        <div class="viz-col" id="mapColumn" style="min-width:320px;">
-          <div class="map-header">
-            <h5 class="mb-0"><i class="fas fa-map-marker-alt me-1"></i> India Map</h5>
-            <div class="map-actions">
-              <span class="badge-status" id="mapStatus">Idle</span>
-              <button id="mapFullscreen" class="btn btn-sm btn-outline-secondary" title="Map Fullscreen"><i class="fas fa-expand"></i></button>
-            </div>
-          </div>
-          <div id="map"></div>
-        </div>
-      </div>
-
-      <!-- Data Table -->
-      <div class="table-section">
+      <!-- Excel visualizer section -->
+      <section id="excel-visualizer" aria-live="polite">
         <div class="d-flex justify-content-between align-items-center mb-2">
-          <h6 class="mb-0"><i class="fas fa-table me-1"></i> Full Data Table</h6>
-          <div class="d-flex gap-2">
-            <input id="tableSearch" class="form-control form-control-sm" placeholder="Search rows..." style="min-width:160px;">
-            <button id="exportCsvBtn" class="btn btn-outline-secondary btn-sm" disabled><i class="fas fa-file-csv me-1"></i>Export CSV</button>
+          <h4>Excel Visualizer</h4>
+          <div class="text-end small text-muted">Upload a file to auto-generate charts & map markers</div>
+        </div>
+
+        <!-- Chart controls -->
+        <div class="card mb-3 p-3">
+          <div class="row g-2">
+            <div class="col-md-3">
+              <label class="form-label">Select Sheet</label>
+              <select id="sheetSelect" class="form-select" disabled></select>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">Chart Type</label>
+              <select id="chartTypeSelect" class="form-select">
+                <option value="auto">Auto-detect</option>
+                <option value="table">Preview Table</option>
+
+                <!-- Standard Chart.js / common charts -->
+                <option value="bar">Bar</option>
+                <option value="horizontalBar">Horizontal Bar</option>
+                <option value="stackedBar">Stacked Bar</option>
+                <option value="line">Line</option>
+                <option value="area">Area</option>
+                <option value="pie">Pie</option>
+                <option value="doughnut">Doughnut</option>
+                <option value="radar">Radar</option>
+                <option value="polarArea">Polar Area</option>
+                <option value="bubble">Bubble</option>
+                <option value="scatter">Scatter</option>
+
+                <!-- Statistical / advanced -->
+                <option value="histogram">Histogram (placeholder)</option>
+                <option value="boxplot">Box Plot (placeholder)</option>
+                <option value="violin">Violin Plot (placeholder)</option>
+
+                <!-- Large-multidim / specialized -->
+                <option value="heatmap">Heatmap (placeholder)</option>
+                <option value="treemap">Treemap (placeholder)</option>
+                <option value="sankey">Sankey Diagram (placeholder)</option>
+                <option value="sunburst">Sunburst (placeholder)</option>
+                <option value="funnel">Funnel Chart (placeholder)</option>
+
+                <!-- Maps / financial -->
+                <option value="gauge">Gauge / Dial (placeholder)</option>
+                <option value="candlestick">Candlestick (placeholder)</option>
+                <option value="choropleth">Choropleth Map (placeholder)</option>
+              </select>
+            </div>
+
+            <div class="col-md-2">
+              <label class="form-label">Top N (for bar/pie)</label>
+              <input id="topN" type="number" min="1" step="1" value="10" class="form-control">
+            </div>
+
+            <div class="col-md-3 d-flex align-items-end gap-2">
+              <button id="refreshCharts" class="btn btn-success">Refresh Charts</button>
+              <button id="downloadChartBtn" class="btn btn-outline-primary" disabled>Download Chart</button>
+            </div>
           </div>
         </div>
 
-        <div class="table-wrapper">
-          <table class="table table-hover compact-table mb-0">
-            <thead class="bg-white">
-              <tr>
-                <th>Vendor</th>
-                <th>Type</th>
-                <th>Region</th>
-                <th>Revenue</th>
-                <th>Latitude</th>
-                <th>Longitude</th>
-              </tr>
-            </thead>
-            <tbody id="dataTableBody">
-              <!-- Filled by JS -->
-            </tbody>
-          </table>
+        <!-- Chart & Map Row -->
+        <div class="row">
+          <div class="col-lg-7">
+            <!-- Chart container -->
+            <div id="chartsGrid" class="card p-3 mb-3">
+              <div id="chartArea">
+                <canvas id="mainChart" style="max-height:400px;"></canvas>
+                <!-- Preview table if chosen -->
+                <div id="previewTableWrapper" class="mt-3" style="display:none;">
+                  <h6>Data preview</h6>
+                  <div id="previewTableContainer" class="table-responsive"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-5">
+            <!-- Map -->
+            <div class="card mb-3">
+              <div class="card-header d-flex justify-content-between align-items-center">
+                <span>India Map</span>
+                <small id="mapStatus" class="text-muted">Idle</small>
+              </div>
+              <div class="card-body p-2">
+                <div id="map" style="height:420px;"></div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+
+        <!-- Data table + search -->
+        <div class="card mt-3 p-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0">Full Data Table</h6>
+            <div class="d-flex gap-2">
+              <input id="tableSearch" class="form-control form-control-sm" placeholder="Search rows..." style="min-width:220px;">
+              <button id="exportCsvBtn" class="btn btn-outline-secondary btn-sm" disabled>Export CSV/XLSX</button>
+            </div>
+          </div>
+          <div id="dataTableContainer" class="table-responsive small" style="max-height:360px; overflow:auto;"></div>
+        </div>
+      </section>
     </main>
   </div>
 
-  <!-- External Scripts -->
+  <!-- Upload Modal -->
+  <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Upload Excel / CSV</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div id="dropZone" class="p-4 border rounded text-center">
+            <p class="lead">Drag & Drop <strong>.xlsx</strong> or <strong>.csv</strong> here — or click to choose a file</p>
+            <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none;">
+            <button id="chooseFileBtn" class="btn btn-outline-primary">Choose file</button>
+            <div id="uploadHint" class="mt-3 text-muted small">
+              First row should contain headers. Multiple sheets supported.
+            </div>
+          </div>
+
+          <div id="uploadErrors" class="mt-3 text-danger small" style="display:none;"></div>
+
+          <div id="sheetPreview" class="mt-3" style="display:none;">
+            <h6>Sheets</h6>
+            <ul id="sheetList" class="list-group"></ul>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="closeUpload" type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button id="loadFileBtn" type="button" class="btn btn-primary" disabled>Load into Visualizer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart Info Modal (for placeholders / guidance) -->
+  <div class="modal fade" id="chartInfoModal" tabindex="-1" aria-labelledby="chartInfoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-md modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="chartInfoLabel">Chart type information</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div id="chartInfoBody">
+            <!-- filled dynamically from script.js -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="chartInfoClose" type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <a id="chartInfoDocs" class="btn btn-primary" target="_blank" rel="noopener">Learn more</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap scripts -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Main Script (demo-ready implementation) -->
-  <script>
-    /*******************************
-     * Demo dataset — replace with real data import later
-     *******************************/
-    const vendors = [
-      { id:1, name:"Asha Mart", type:"Retail", region:"North", revenue:120000, lat:28.6139, lng:77.2090, portfolio: "<strong>Asha Mart</strong><br/>Retail chain with 5 outlets. Services: FMCG, Electronics.<br/><a href='#'>View more</a>" },
-      { id:2, name:"Kala Wholesalers", type:"Wholesale", region:"West", revenue:300000, lat:19.0760, lng:72.8777, portfolio: "<strong>Kala Wholesalers</strong><br/>Bulk suppliers for garments.<br/><a href='#'>View portfolio</a>" },
-      { id:3, name:"Suryan Services", type:"Services", region:"South", revenue:90000, lat:13.0827, lng:80.2707, portfolio: "<strong>Suryan Services</strong><br/>Consulting & Logistics.<br/><a href='#'>Profile</a>" },
-      { id:4, name:"Greenfield Trade", type:"Wholesale", region:"North", revenue:210000, lat:28.4595, lng:77.0266, portfolio: "<strong>Greenfield Trade</strong><br/>Agriculture produce wholesale.<br/><a href='#'>Open</a>" },
-      { id:5, name:"Bengal Retail", type:"Retail", region:"East", revenue:150000, lat:22.5726, lng:88.3639, portfolio: "<strong>Bengal Retail</strong><br/>Multiple supermarket branches.<br/><a href='#'>View</a>" },
-      { id:6, name:"Coastal Vendors", type:"Services", region:"South", revenue:60000, lat:9.9312, lng:76.2673, portfolio: "<strong>Coastal Vendors</strong><br/>Local services & repairs.<br/><a href='#'>More</a>" }
-    ];
-
-    // initial state
-    let state = {
-      chartType: 'bar',
-      topN: 10,
-      vendorTypes: ['Retail','Wholesale','Services'],
-      regions: ['North','South','East','West']
-    };
-
-    /*******************************
-     * UI helpers
-     *******************************/
-    function updateCounts(){
-      document.getElementById('rowCount').innerText = vendors.length;
-      document.getElementById('colCount').innerText = 6;
-      const vtChecked = Array.from(document.querySelectorAll('.vendor-type-checkbox:checked')).map(i=>i.value);
-      const rgChecked = Array.from(document.querySelectorAll('.region-checkbox:checked')).map(i=>i.value);
-      document.getElementById('vendorTypeCount').innerText = `(${vtChecked.length})`;
-      document.getElementById('regionCount').innerText = `(${rgChecked.length})`;
-    }
-
-    /*******************************
-     * Chart Setup (Chart.js)
-     *******************************/
-    const ctx = document.getElementById('mainChart').getContext('2d');
-
-    const chartConfig = {
-      type: 'bar',
-      data: {labels: [], datasets: [{ label:'Revenue', data: [], backgroundColor: [] }]},
-      options: {
-        responsive:true,
-        maintainAspectRatio:false,
-        plugins:{
-          legend:{display:false},
-          tooltip:{mode:'index', intersect:false}
-        },
-        scales:{
-          x:{ticks:{maxRotation:0, autoSkip:true}},
-          y:{beginAtZero:true}
-        }
-      }
-    };
-    let mainChart = new Chart(ctx, chartConfig);
-
-    function buildColor(i){ // simple palette
-      const palette = ["#2563eb","#06b6d4","#f97316","#10b981","#7c3aed","#ef4444","#f59e0b","#0ea5a4"];
-      return palette[i % palette.length];
-    }
-
-    function applyFiltersAndRender(){
-      // read filters
-      const selectedTypes = Array.from(document.querySelectorAll('.vendor-type-checkbox:checked')).map(i=>i.value);
-      const selectedRegions = Array.from(document.querySelectorAll('.region-checkbox:checked')).map(i=>i.value);
-      const topN = parseInt(document.getElementById('topN').value || '10',10);
-      state.chartType = document.getElementById('chartType').value;
-      state.topN = topN;
-
-      // filter dataset
-      let filtered = vendors.filter(v => selectedTypes.includes(v.type) && selectedRegions.includes(v.region));
-
-      // optional global search
-      const globalSearch = document.getElementById('globalSearch').value.trim().toLowerCase();
-      if(globalSearch){
-        filtered = filtered.filter(v => (v.name + ' ' + v.type + ' ' + v.region).toLowerCase().includes(globalSearch));
-      }
-
-      // table
-      renderTable(filtered);
-
-      // update map markers
-      renderMapMarkers(filtered);
-
-      // prepare chart data: top N by revenue
-      const sorted = filtered.slice().sort((a,b)=>b.revenue - a.revenue).slice(0, topN);
-      const labels = sorted.map(s=>s.name);
-      const data = sorted.map(s=>s.revenue);
-      const colors = sorted.map((_,i)=>buildColor(i));
-
-      // update chart config depending on type
-      if(state.chartType === 'pie'){
-        mainChart.destroy();
-        mainChart = new Chart(ctx, {
-          type: 'pie',
-          data: { labels, datasets: [{ data, backgroundColor: colors }]},
-          options:{responsive:true, maintainAspectRatio:false}
-        });
-      } else if(state.chartType === 'line'){
-        mainChart.destroy();
-        mainChart = new Chart(ctx, {
-          type: 'line',
-          data: { labels, datasets: [{ label:'Revenue', data, borderColor: colors[0], backgroundColor: 'rgba(0,0,0,0)' }]},
-          options:{responsive:true, maintainAspectRatio:false}
-        });
-      } else { // bar
-        mainChart.destroy();
-        mainChart = new Chart(ctx, {
-          type: 'bar',
-          data: { labels, datasets: [{ label:'Revenue', data, backgroundColor: colors }]},
-          options:{responsive:true, maintainAspectRatio:false}
-        });
-      }
-
-      // update UI counts
-      updateCounts();
-
-      // update map status
-      document.getElementById('mapStatus').innerText = filtered.length ? `${filtered.length} pins` : 'No pins';
-    }
-
-    /*******************************
-     * Table rendering
-     *******************************/
-    function renderTable(list){
-      const tbody = document.getElementById('dataTableBody');
-      tbody.innerHTML = '';
-      if(!list.length){
-        tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center py-3">No records found</td></tr>';
-        return;
-      }
-      for(const v of list){
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${v.name}</td>
-          <td>${v.type}</td>
-          <td>${v.region}</td>
-          <td>₹ ${v.revenue.toLocaleString()}</td>
-          <td>${v.lat.toFixed(4)}</td>
-          <td>${v.lng.toFixed(4)}</td>
-        `;
-        tbody.appendChild(tr);
-      }
-    }
-
-    /*******************************
-     * Leaflet Map + Markers
-     *******************************/
-    let map = L.map('map', {preferCanvas:true}).setView([22.0,79.0], 5);
-
-    // tile layer (open-source)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
-
-    let markerLayer = L.layerGroup().addTo(map);
-    function renderMapMarkers(list){
-      markerLayer.clearLayers();
-      list.forEach(v=>{
-        if(!v.lat || !v.lng) return;
-        const marker = L.marker([v.lat, v.lng]).addTo(markerLayer);
-        // tooltip on hover
-        marker.bindTooltip(`<strong>${v.name}</strong><br/>${v.type} — ${v.region}`, {direction:'top'});
-        // popup on click with portfolio HTML
-        marker.on('click', () => {
-          L.popup({maxWidth:320})
-            .setLatLng([v.lat, v.lng])
-            .setContent(`<div style="min-width:220px">${v.portfolio}</div>`)
-            .openOn(map);
-        });
-      });
-
-      // fit bounds if markers exist
-      if(list.length){
-        const bounds = L.latLngBounds(list.filter(l=>l.lat && l.lng).map(l => [l.lat, l.lng]));
-        if(bounds.isValid()) map.fitBounds(bounds.pad(0.2));
-      }
-    }
-
-    /*******************************
-     * Fullscreen handlers
-     *******************************/
-    function toggleFullscreen(el){
-      if(!document.fullscreenElement){
-        el.requestFullscreen && el.requestFullscreen();
-      } else {
-        document.exitFullscreen && document.exitFullscreen();
-      }
-    }
-    document.getElementById('chartFullscreen').addEventListener('click', ()=>{
-      toggleFullscreen(document.getElementById('chartColumn'));
-    });
-    document.getElementById('mapFullscreen').addEventListener('click', ()=>{
-      toggleFullscreen(document.getElementById('mapColumn'));
-      setTimeout(()=>{ map.invalidateSize(); }, 300);
-    });
-
-    /*******************************
-     * Download chart as PNG
-     *******************************/
-    document.getElementById('downloadChartBtn').addEventListener('click', ()=>{
-      const link = document.createElement('a');
-      link.href = document.getElementById('mainChart').toDataURL('image/png',1);
-      link.download = 'chart.png';
-      link.click();
-    });
-
-    /*******************************
-     * Filters UI events
-     *******************************/
-    document.getElementById('applyFilters').addEventListener('click', ()=> applyFiltersAndRender());
-    document.getElementById('clearFilters').addEventListener('click', ()=>{
-      // check all filters
-      document.querySelectorAll('.vendor-type-checkbox, .region-checkbox').forEach(cb => cb.checked = true);
-      document.getElementById('globalSearch').value = '';
-      document.getElementById('topN').value = 10;
-      document.getElementById('chartType').value = 'bar';
-      applyFiltersAndRender();
-    });
-
-    // update counts when checkboxes change
-    document.querySelectorAll('.vendor-type-checkbox, .region-checkbox').forEach(cb=>{
-      cb.addEventListener('change', ()=> updateCounts());
-    });
-
-    // search in table
-    document.getElementById('tableSearch').addEventListener('input', (e)=>{
-      const q = e.target.value.trim().toLowerCase();
-      const rows = Array.from(document.querySelectorAll('#dataTableBody tr'));
-      for(const r of rows){
-        const text = r.innerText.toLowerCase();
-        r.style.display = text.includes(q) ? '' : 'none';
-      }
-    });
-
-    // global search triggers a filter apply
-    document.getElementById('globalSearch').addEventListener('input', ()=>{
-      // small debounce
-      clearTimeout(window._gsdeb);
-      window._gsdeb = setTimeout(()=> applyFiltersAndRender(), 350);
-    });
-
-    // topN immediate
-    document.getElementById('topN').addEventListener('change', ()=> applyFiltersAndRender());
-    document.getElementById('chartType').addEventListener('change', ()=> applyFiltersAndRender());
-
-    /*******************************
-     * Init demo content
-     *******************************/
-    function initDemo(){
-      // show all initial
-      document.querySelectorAll('.vendor-type-checkbox, .region-checkbox').forEach(cb => cb.checked = true);
-      // render initial
-      applyFiltersAndRender();
-    }
-
-    // small demo: reset button will re-center map and reset filters
-    document.getElementById('resetBtn').addEventListener('click', ()=>{
-      document.getElementById('globalSearch').value = '';
-      document.querySelectorAll('.vendor-type-checkbox, .region-checkbox').forEach(cb => cb.checked = true);
-      applyFiltersAndRender();
-    });
-
-    // initial call
-    initDemo();
-
-    // resize handler to keep map correct
-    window.addEventListener('resize', ()=> { setTimeout(()=> map.invalidateSize(), 200); });
-
-    /*******************************
-     * Replaceable spots:
-     * - Replace vendors[] with actual data parsed from uploaded file (XLSX / CSV)
-     * - Hook uploadBtn -> file input + parsing, then update vendors and call applyFiltersAndRender()
-     *******************************/
-  </script>
+  <!-- Main script -->
+  <script src="script.js"></script>
 </body>
 </html>
