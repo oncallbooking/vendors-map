@@ -89,19 +89,45 @@
               <select id="sheetSelect" class="form-select" disabled></select>
             </div>
 
-            <div class="col-md-3">
+            <div class="col-md-4">
               <label class="form-label">Chart Type</label>
               <select id="chartTypeSelect" class="form-select">
                 <option value="auto">Auto-detect</option>
-                <option value="pie">Pie</option>
-                <option value="bar">Bar</option>
-                <option value="line">Line</option>
-                <option value="bubble">Bubble</option>
                 <option value="table">Preview Table</option>
+
+                <!-- Standard Chart.js / common charts -->
+                <option value="bar">Bar</option>
+                <option value="horizontalBar">Horizontal Bar</option>
+                <option value="stackedBar">Stacked Bar</option>
+                <option value="line">Line</option>
+                <option value="area">Area</option>
+                <option value="pie">Pie</option>
+                <option value="doughnut">Doughnut</option>
+                <option value="radar">Radar</option>
+                <option value="polarArea">Polar Area</option>
+                <option value="bubble">Bubble</option>
+                <option value="scatter">Scatter</option>
+
+                <!-- Statistical / advanced -->
+                <option value="histogram">Histogram (placeholder)</option>
+                <option value="boxplot">Box Plot (placeholder)</option>
+                <option value="violin">Violin Plot (placeholder)</option>
+
+                <!-- Large-multidim / specialized -->
+                <option value="heatmap">Heatmap (placeholder)</option>
+                <option value="treemap">Treemap (placeholder)</option>
+                <option value="sankey">Sankey Diagram (placeholder)</option>
+                <option value="sunburst">Sunburst (placeholder)</option>
+                <option value="funnel">Funnel Chart (placeholder)</option>
+
+                <!-- Maps / financial -->
+                <option value="gauge">Gauge / Dial (placeholder)</option>
+                <option value="candlestick">Candlestick (placeholder)</option>
+                <option value="choropleth">Choropleth Map (placeholder)</option>
               </select>
             </div>
 
-            <div class="col-md-3">
+            <div class="col-md-2">
               <label class="form-label">Top N (for bar/pie)</label>
               <input id="topN" type="number" min="1" step="1" value="10" class="form-control">
             </div>
@@ -186,6 +212,27 @@
         <div class="modal-footer">
           <button id="closeUpload" type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
           <button id="loadFileBtn" type="button" class="btn btn-primary" disabled>Load into Visualizer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart Info Modal (for placeholders / guidance) -->
+  <div class="modal fade" id="chartInfoModal" tabindex="-1" aria-labelledby="chartInfoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-md modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="chartInfoLabel">Chart type information</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div id="chartInfoBody">
+            <!-- filled dynamically from script.js -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="chartInfoClose" type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <a id="chartInfoDocs" class="btn btn-primary" target="_blank" rel="noopener">Learn more</a>
         </div>
       </div>
     </div>
