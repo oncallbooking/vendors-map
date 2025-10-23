@@ -1,11 +1,11 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>DataViz Pro — Upload & Live Dashboard</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Final Dashboard — 10 Charts, Sidebar Filters, Fullscreen</title>
 
-  <!-- CSS libs -->
+  <!-- Libraries -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
   <link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet">
@@ -13,169 +13,147 @@
 
   <style>
     :root{
-      --bg:#f5f7fb; --card:#ffffff; --text:#0f172a; --muted:#6b7280; --accent:#2563eb;
+      --bg:#f5f7fb; --card:#fff; --text:#0f172a; --muted:#6b7280; --accent:#2563eb; --radius:12px; --shadow:0 6px 20px rgba(16,24,40,0.06);
     }
-    body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--text);margin:0}
-    .dashboard{display:flex;min-height:100vh}
-    aside.sidebar{width:240px;background:#071028;color:#fff;padding:18px;box-shadow:4px 0 20px rgba(2,6,23,0.06)}
-    aside .logo{display:flex;gap:10px;align-items:center}
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--text);margin:0}
+    .app{display:flex;min-height:100vh}
+    aside.sidebar{width:320px;background:#071028;color:#fff;padding:18px;box-shadow:4px 0 20px rgba(2,6,23,0.06);overflow:auto}
     main{flex:1;padding:20px}
-    .filters-bar{background:var(--card);padding:12px;border-radius:10px;box-shadow:0 6px 20px rgba(16,24,40,0.06);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .viz-row{display:flex;gap:16px;margin-top:16px;align-items:flex-start}
-    .viz-col{flex:1;background:var(--card);padding:12px;border-radius:10px;box-shadow:0 6px 20px rgba(16,24,40,0.06);min-width:300px}
-    #map{height:430px;border-radius:8px}
-    canvas#mainChart{max-height:420px;width:100%!important}
-    .table-section{margin-top:16px;background:var(--card);padding:12px;border-radius:10px;box-shadow:0 6px 20px rgba(16,24,40,0.06)}
-    .compact-table td,.compact-table th{padding:.45rem .6rem}
-    table thead th{position:sticky;top:0;background:var(--card);z-index:2}
-    .toolbar .btn{margin-left:6px}
-    .dropdown-menu.multi-select{max-height:220px;overflow:auto;padding:8px}
+    .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .filters-sidebar { background:var(--card); padding:12px; border-radius:10px; box-shadow:var(--shadow); color:var(--text); margin-bottom:14px; }
+    .filter-group { max-height:220px; overflow:auto; padding:8px; border-radius:8px; border:1px solid #efefef; background:#fafafa; margin-bottom:10px }
+    .filter-title { font-weight:600; font-size:0.95rem; margin-bottom:6px; display:flex;align-items:center;justify-content:space-between; }
+    .viz-row{display:flex;gap:16px;align-items:flex-start}
+    .col-chart, .col-map{flex:1;background:var(--card);padding:12px;border-radius:10px;box-shadow:var(--shadow);min-width:320px}
+    #map{height:520px;border-radius:8px}
+    canvas#mainChart{width:100% !important; height:520px !important}
+    .table-section{margin-top:18px;background:var(--card);padding:12px;border-radius:10px;box-shadow:var(--shadow)}
+    .table-wrapper{max-height:360px; overflow:auto}
+    table { width:100%; border-collapse:collapse }
+    table td, table th{ padding:10px; vertical-align:top; white-space:normal; word-break:break-word }
+    table thead th{ position:sticky; top:0; background:var(--card); z-index:2; }
     .control-small{height:40px;padding:.375rem .6rem}
-    @media(max-width:992px){.viz-row{flex-direction:column}}
-    /* dark theme toggle */
+    .select-all { font-size:0.85rem; cursor:pointer; color:var(--accent); }
+    @media(max-width:1100px){ aside.sidebar{display:none} .viz-row{flex-direction:column} }
+    /* Fullscreen overrides */
+    :fullscreen .col-chart, :fullscreen .col-map { height: 100vh; width:100vw; margin:0; border-radius:0; box-shadow:none; }
+    /* theme dark */
     .theme-dark{background:#071028;color:#e6eef8}
-    .theme-dark .viz-col, .theme-dark .filters-bar, .theme-dark .table-section{background:#0c1726}
-    .theme-dark table thead th{background:#0c1726}
+    .theme-dark .col-chart, .theme-dark .col-map, .theme-dark .table-section, .theme-dark .filters-sidebar{ background:#0b1726 }
   </style>
 </head>
 <body>
-  <div class="dashboard">
+  <div class="app">
+    <!-- Sidebar (filters moved here) -->
     <aside class="sidebar">
-      <div class="logo mb-3">
-        <div style="width:44px;height:44px;border-radius:8px;background:#fff;color:#071028;display:flex;align-items:center;justify-content:center">
-          <i class="fas fa-chart-line"></i>
+      <div class="d-flex gap-2 align-items-center mb-3">
+        <div style="width:46px;height:46px;border-radius:8px;background:#fff;color:#071028;display:flex;align-items:center;justify-content:center">
+          <i class="fas fa-chart-pie"></i>
         </div>
         <div>
-          <h5 style="margin:0">DataViz Pro</h5>
-          <small style="opacity:.85">Upload → Visualize → Export</small>
+          <h5 style="margin:0">Analytics Pro</h5>
+          <small style="opacity:.85">10 charts · Fullscreen · Exports</small>
         </div>
       </div>
 
       <div class="mb-3">
         <label class="form-label text-white-50 mb-1">Upload dataset</label>
-        <div class="d-flex gap-2">
-          <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" class="form-control form-control-sm" />
+        <input id="filePicker" type="file" accept=".xlsx,.xls,.csv" class="form-control form-control-sm">
+        <div class="mt-2 d-grid">
+          <button id="loadDemo" class="btn btn-sm btn-outline-light">Load Demo</button>
         </div>
-        <small class="text-white-50">Supported: .xlsx, .xls, .csv</small>
       </div>
 
-      <div class="mb-2">
-        <button id="loadSample" class="btn btn-sm btn-outline-light w-100"><i class="fas fa-database me-1"></i> Load Demo Data</button>
+      <div class="filters-sidebar">
+        <div class="d-flex justify-content-between align-items-end mb-2">
+          <div><strong>Filters</strong><div class="text-muted small">Select to filter results</div></div>
+          <div class="text-end">
+            <button id="resetFiltersBtn" class="btn btn-sm btn-outline-secondary">Reset</button>
+          </div>
+        </div>
+
+        <!-- Dynamic generated filter groups -->
+        <div id="filtersContainer" style="max-height:58vh; overflow:auto"></div>
+
+        <div class="mt-2 d-flex gap-2 justify-content-between">
+          <div><small class="text-muted">Rows: <span id="rowCount">0</span></small></div>
+          <div><small class="text-muted">Cols: <span id="colCount">0</span></small></div>
+        </div>
       </div>
 
-      <hr style="border-color:rgba(255,255,255,0.06)">
-
-      <div>
-        <div><small class="text-white-50">Rows</small><div id="rowCount" style="font-weight:600">0</div></div>
-        <div class="mt-2"><small class="text-white-50">Columns</small><div id="colCount" style="font-weight:600">0</div></div>
-      </div>
-
-      <div class="mt-4">
-        <button id="themeToggle" class="btn btn-sm btn-light w-100"><i class="fas fa-moon me-1"></i> Toggle Theme</button>
+      <div class="mt-3">
+        <button id="themeToggle" class="btn btn-sm btn-light w-100 mb-2"><i class="fas fa-moon me-1"></i> Theme</button>
+        <button id="exportCsv" class="btn btn-sm btn-outline-light w-100 mb-2" disabled><i class="fas fa-file-csv me-1"></i> Export CSV</button>
+        <button id="exportXlsx" class="btn btn-sm btn-outline-light w-100 mb-2" disabled><i class="fas fa-file-excel me-1"></i> Export XLSX</button>
       </div>
     </aside>
 
+    <!-- Main content -->
     <main>
-      <!-- header -->
-      <div class="d-flex justify-content-between align-items-center mb-3">
+      <div class="header">
         <div>
-          <h3 style="margin:0">Analytics Dashboard</h3>
-          <small class="text-muted">Top filters → Chart & Map → Data table</small>
+          <h3 style="margin:0">Dashboard</h3>
+          <small class="text-muted">Sidebar filters · full-screen charts & map · export & print</small>
         </div>
-        <div class="d-flex align-items-center">
-          <input id="globalSearch" class="form-control form-control-sm me-2" placeholder="Global search..." style="min-width:200px">
-          <div class="btn-group toolbar" role="group">
-            <button id="exportCsvBtn" class="btn btn-outline-secondary btn-sm" title="Export CSV" disabled><i class="fas fa-file-csv"></i></button>
-            <button id="exportXlsxBtn" class="btn btn-outline-secondary btn-sm" title="Export XLSX" disabled><i class="fas fa-file-excel"></i></button>
-            <button id="printBtn" class="btn btn-outline-secondary btn-sm" title="Print dashboard"><i class="fas fa-print"></i></button>
-            <button id="resetBtn" class="btn btn-outline-secondary btn-sm" title="Reset view"><i class="fas fa-undo"></i></button>
+        <div class="d-flex gap-2 align-items-center">
+          <input id="globalSearch" class="form-control form-control-sm" placeholder="Global search..." style="min-width:240px">
+          <select id="chartSelect" class="form-select control-small" style="min-width:220px">
+            <!-- 10 chart types -->
+            <option value="bar">Bar</option>
+            <option value="horizontalBar">Horizontal Bar</option>
+            <option value="line">Line</option>
+            <option value="area">Area</option>
+            <option value="pie">Pie</option>
+            <option value="doughnut">Doughnut</option>
+            <option value="polarArea">Polar Area</option>
+            <option value="radar">Radar</option>
+            <option value="bubble">Bubble</option>
+            <option value="scatter">Scatter</option>
+          </select>
+          <input id="topN" type="number" min="1" value="10" class="form-control control-small" style="width:100px" title="Top N">
+          <div class="btn-group">
+            <button id="chartFullscreen" class="btn btn-outline-secondary btn-sm" title="Chart fullscreen"><i class="fas fa-expand"></i></button>
+            <button id="mapFullscreen" class="btn btn-outline-secondary btn-sm" title="Map fullscreen"><i class="fas fa-expand"></i></button>
+            <button id="downloadChart" class="btn btn-outline-primary btn-sm" title="Download Chart" disabled><i class="fas fa-download"></i></button>
+            <button id="printBtn" class="btn btn-outline-secondary btn-sm" title="Print"><i class="fas fa-print"></i></button>
           </div>
         </div>
       </div>
 
-      <!-- Filters bar -->
-      <div class="filters-bar mb-2" id="filtersBar">
-        <div class="dropdown filter-dropdown">
-          <button class="btn btn-outline-secondary dropdown-toggle control-small" id="ddVendorType" data-bs-toggle="dropdown" aria-expanded="false">
-            Vendor Type <small id="vendorTypeCount" class="text-muted ms-2">(All)</small>
-          </button>
-          <div class="dropdown-menu multi-select" aria-labelledby="ddVendorType" id="vendorTypeMenu">
-            <!-- checkboxes appended by JS -->
-          </div>
-        </div>
-
-        <div class="dropdown filter-dropdown">
-          <button class="btn btn-outline-secondary dropdown-toggle control-small" id="ddRegion" data-bs-toggle="dropdown" aria-expanded="false">
-            Region <small id="regionCount" class="text-muted ms-2">(All)</small>
-          </button>
-          <div class="dropdown-menu multi-select" aria-labelledby="ddRegion" id="regionMenu">
-            <!-- checkboxes appended by JS -->
-          </div>
-        </div>
-
-        <select id="chartType" class="form-select control-small" style="min-width:160px">
-          <option value="bar">Bar (Top N)</option>
-          <option value="pie">Pie</option>
-          <option value="line">Line</option>
-        </select>
-
-        <input id="topN" type="number" min="1" value="10" class="form-control control-small" style="width:110px" title="Top N" />
-
-        <div class="ms-auto d-flex gap-2">
-          <button id="applyFilters" class="btn btn-primary btn-sm"><i class="fas fa-filter me-1"></i> Apply</button>
-          <button id="clearFilters" class="btn btn-outline-secondary btn-sm"><i class="fas fa-redo me-1"></i> Reset</button>
-        </div>
-      </div>
-
-      <!-- Chart + Map -->
       <div class="viz-row">
-        <div class="viz-col" id="chartColumn">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <h5 class="mb-0" id="chartTitle">Main Chart</h5>
-            <div>
-              <button id="chartFullscreen" class="btn btn-sm btn-outline-secondary" title="Chart Fullscreen"><i class="fas fa-expand"></i></button>
-              <button id="downloadChartBtn" class="btn btn-sm btn-outline-primary" title="Download Chart"><i class="fas fa-download"></i></button>
-            </div>
-          </div>
-          <div style="height:420px">
-            <canvas id="mainChart"></canvas>
-          </div>
+        <div class="col-chart">
+          <h5 id="chartTitle">Main Chart</h5>
+          <canvas id="mainChart"></canvas>
         </div>
 
-        <div class="viz-col" id="mapColumn">
+        <div class="col-map">
           <div class="d-flex justify-content-between align-items-center mb-2">
-            <h5 class="mb-0"><i class="fas fa-map-marker-alt me-1"></i> India Map</h5>
-            <div>
-              <span id="mapStatus" class="badge bg-light text-dark me-2">Idle</span>
-              <button id="mapFullscreen" class="btn btn-sm btn-outline-secondary" title="Map Fullscreen"><i class="fas fa-expand"></i></button>
-            </div>
+            <h5 class="mb-0"><i class="fas fa-map-marker-alt me-1"></i> Map</h5>
+            <small id="mapStatus" class="text-muted">Idle</small>
           </div>
           <div id="map"></div>
         </div>
       </div>
 
-      <!-- Data table -->
       <div class="table-section">
         <div class="d-flex justify-content-between align-items-center mb-2">
-          <h6 class="mb-0"><i class="fas fa-table me-1"></i> Data Explorer</h6>
+          <h6 class="mb-0"><i class="fas fa-table me-1"></i> Data Table</h6>
           <div class="d-flex gap-2">
-            <input id="tableSearch" class="form-control form-control-sm" placeholder="Search rows..." style="min-width:200px">
-            <select id="rowsPerPage" class="form-select form-select-sm" style="width:110px">
-              <option value="10">10 rows</option>
-              <option value="25" selected>25 rows</option>
-              <option value="50">50 rows</option>
+            <input id="tableSearch" class="form-control form-control-sm" placeholder="Search table..." style="min-width:220px">
+            <select id="rowsPerPage" class="form-select form-select-sm" style="width:120px">
+              <option value="10">10</option>
+              <option value="25" selected>25</option>
+              <option value="50">50</option>
             </select>
           </div>
         </div>
 
-        <div class="table-wrapper" style="max-height:320px;overflow:auto">
-          <table class="table table-hover compact-table mb-0">
+        <div class="table-wrapper">
+          <table class="table table-hover mb-0">
             <thead>
-              <tr>
-                <th>Vendor</th><th>Type</th><th>Region</th><th>Revenue</th><th>Latitude</th><th>Longitude</th>
-              </tr>
+              <tr id="tableHeader"></tr>
             </thead>
-            <tbody id="dataTableBody"></tbody>
+            <tbody id="tableBody"></tbody>
           </table>
         </div>
       </div>
@@ -187,329 +165,397 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <script>
-  /***************
-   * State & helpers
-   ***************/
-  let vendors = []; // array of objects: {id,name,type,region,revenue,lat,lng,portfolio,...}
-  const defaults = {
-    chartType:'bar',
-    topN:10
-  };
+  // ---------- State ----------
+  let rawData = [];     // original rows (array of objects)
+  let viewData = [];    // filtered rows
+  let meta = { headers:[], numeric:[], categorical:[] };
+  let chart = null;
+  let map = null, markerLayer = null;
 
-  function safeNum(v){ const n = Number(v); return Number.isFinite(n)? n : null; }
-
-  /***************
-   * UI elements
-   ***************/
-  const fileInput = document.getElementById('fileInput');
-  const loadSample = document.getElementById('loadSample');
-  const exportCsvBtn = document.getElementById('exportCsvBtn');
-  const exportXlsxBtn = document.getElementById('exportXlsxBtn');
-  const printBtn = document.getElementById('printBtn');
-  const themeToggle = document.getElementById('themeToggle');
-  const applyFiltersBtn = document.getElementById('applyFilters');
-  const clearFiltersBtn = document.getElementById('clearFilters');
-  const vendorTypeMenu = document.getElementById('vendorTypeMenu');
-  const regionMenu = document.getElementById('regionMenu');
-  const vendorTypeCount = document.getElementById('vendorTypeCount');
-  const regionCount = document.getElementById('regionCount');
-  const rowCountEl = document.getElementById('rowCount');
-  const colCountEl = document.getElementById('colCount');
+  // DOM
+  const filePicker = document.getElementById('filePicker');
+  const loadDemo = document.getElementById('loadDemo');
+  const filtersContainer = document.getElementById('filtersContainer');
+  const chartSelect = document.getElementById('chartSelect');
+  const topN = document.getElementById('topN');
+  const downloadChart = document.getElementById('downloadChart');
+  const globalSearch = document.getElementById('globalSearch');
+  const tableSearch = document.getElementById('tableSearch');
+  const tableBody = document.getElementById('tableBody');
+  const tableHeader = document.getElementById('tableHeader');
+  const rowsPerPage = document.getElementById('rowsPerPage');
+  const exportCsv = document.getElementById('exportCsv');
+  const exportXlsx = document.getElementById('exportXlsx');
   const mapStatus = document.getElementById('mapStatus');
+  const themeToggle = document.getElementById('themeToggle');
+  const resetFiltersBtn = document.getElementById('resetFiltersBtn');
+  const chartFullscreen = document.getElementById('chartFullscreen');
+  const mapFullscreen = document.getElementById('mapFullscreen');
+  const downloadChartBtn = document.getElementById('downloadChart');
 
-  /***************
-   * Demo data loader
-   ***************/
-  function loadDemo(){
-    vendors = [
-      {id:1,name:"Asha Mart",type:"Retail",region:"North",revenue:120000,lat:28.6139,lng:77.2090, portfolio:"<strong>Asha Mart</strong><br/>Retail chain. <a href='#'>More</a>"},
-      {id:2,name:"Kala Wholesalers",type:"Wholesale",region:"West",revenue:300000,lat:19.0760,lng:72.8777, portfolio:"<strong>Kala Wholesalers</strong><br/>Wholesale supplier."},
-      {id:3,name:"Suryan Services",type:"Services",region:"South",revenue:90000,lat:13.0827,lng:80.2707, portfolio:"<strong>Suryan Services</strong><br/>Logistics & consulting."},
-      {id:4,name:"Greenfield Trade",type:"Wholesale",region:"North",revenue:210000,lat:28.4595,lng:77.0266, portfolio:"<strong>Greenfield Trade</strong><br/>Agri wholesale."},
-      {id:5,name:"Bengal Retail",type:"Retail",region:"East",revenue:150000,lat:22.5726,lng:88.3639, portfolio:"<strong>Bengal Retail</strong><br/>Supermarket chain."},
-      {id:6,name:"Coastal Vendors",type:"Services",region:"South",revenue:60000,lat:9.9312,lng:76.2673, portfolio:"<strong>Coastal Vendors</strong><br/>Local services."}
-    ];
-    postDataLoad();
+  // ---------- Init ----------
+  document.addEventListener('DOMContentLoaded', ()=>{
+    initMap();
+    attachEvents();
+    loadDemoDataset();
+  });
+
+  function attachEvents(){
+    filePicker.addEventListener('change', handleFileUpload);
+    loadDemo.addEventListener('click', loadDemoDataset);
+    chartSelect.addEventListener('change', renderChart);
+    topN.addEventListener('change', renderChart);
+    globalSearch.addEventListener('input', applyFiltersDebounced);
+    tableSearch.addEventListener('input', renderTable);
+    rowsPerPage.addEventListener('change', renderTable);
+    exportCsv.addEventListener('click', exportCSV);
+    exportXlsx.addEventListener('click', exportXLSX);
+    themeToggle.addEventListener('click', ()=> document.body.classList.toggle('theme-dark'));
+    resetFiltersBtn.addEventListener('click', ()=> { resetAllFilters(); applyFilters(); });
+    chartFullscreen.addEventListener('click', ()=> toggleFullscreen(document.querySelector('.col-chart')));
+    mapFullscreen.addEventListener('click', ()=> { toggleFullscreen(document.querySelector('.col-map')); setTimeout(()=> map.invalidateSize(), 300); });
+    downloadChartBtn.addEventListener('click', downloadChartImage);
+    document.addEventListener('fullscreenchange', ()=> { setTimeout(()=> { if(map) map.invalidateSize(); if(chart) try{ chart.resize(); }catch(e){} }, 200); });
   }
-  loadSample.addEventListener('click', loadDemo);
 
-  /***************
-   * File upload parsing (SheetJS)
-   ***************/
-  fileInput.addEventListener('change', async (e)=>{
+  // ---------- File upload ----------
+  async function handleFileUpload(e){
     const f = e.target.files[0];
     if(!f) return;
     const name = f.name.toLowerCase();
-    const buf = await f.arrayBuffer();
     try {
       if(name.endsWith('.csv')){
-        const text = new TextDecoder('utf-8').decode(buf);
-        const rows = XLSX.utils.sheet_to_json(XLSX.utils.csv_to_sheet(text), {defval:''});
-        normalizeAndSet(rows);
+        const text = await f.text();
+        const parsed = Papa.parse(text, { header:true, dynamicTyping:true, skipEmptyLines:true });
+        rawData = parsed.data;
       } else {
-        const wb = XLSX.read(buf, {type:'array'});
-        // prefer first sheet
+        const ab = await f.arrayBuffer();
+        const wb = XLSX.read(ab, { type:'array' });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
-        normalizeAndSet(rows);
+        rawData = XLSX.utils.sheet_to_json(ws, { defval: null });
       }
-      fileInput.value = '';
+      postLoad();
     } catch(err){
-      alert('Failed to parse file: ' + err.message);
+      alert('Upload failed: ' + err.message);
     }
-  });
+  }
 
-  /***************
-   * Normalize arbitrary headers to expected fields
-   ***************/
-  function normalizeAndSet(rows){
-    if(!rows || !rows.length){ alert('No rows found in file'); return; }
-    // detect columns by header names (case-insensitive)
-    const headers = Object.keys(rows[0]).map(h=>h.toLowerCase());
-    const map = {}; // targetField -> actual header
-    // matching candidates
-    const findHeader = candidates => headers.find(h => candidates.some(c => h.includes(c)));
-    map.name = findHeader(['vendor','name','entity']) || headers[0];
-    map.type = findHeader(['type','category']) || null;
-    map.region = findHeader(['region','state','area']) || null;
-    map.revenue = findHeader(['revenue','sales','amount','value']) || null;
-    map.lat = findHeader(['latitude','lat','y']) || null;
-    map.lng = findHeader(['longitude','lon','lng','x']) || null;
-    // create vendors
-    vendors = rows.map((r, idx) => {
-      return {
-        id: idx + 1,
-        name: r[map.name] || ('Vendor ' + (idx+1)),
-        type: map.type ? (r[map.type] || 'Unknown') : 'Unknown',
-        region: map.region ? (r[map.region] || 'Unknown') : 'Unknown',
-        revenue: map.revenue ? (Number(String(r[map.revenue]).toString().replace(/[^0-9.-]+/g,'')) || 0) : 0,
-        lat: map.lat ? safeNum(r[map.lat]) : null,
-        lng: map.lng ? safeNum(r[map.lng]) : null,
-        portfolio: r.portfolio || r.description || ''
-      };
+  function postLoad(){
+    if(!rawData || !rawData.length){ alert('No rows found'); return; }
+    detectMeta();
+    buildFilters();
+    resetAllFilters();
+    applyFilters();
+    exportCsv.disabled = false;
+    exportXlsx.disabled = false;
+  }
+
+  // ---------- Meta detection ----------
+  function detectMeta(){
+    const headers = Object.keys(rawData[0] || {});
+    meta.headers = headers;
+    meta.numeric = []; meta.categorical = [];
+    headers.forEach(h=>{
+      let cntNum=0, cnt=0;
+      for(let i=0;i<Math.min(200,rawData.length);i++){
+        const v = rawData[i][h];
+        if(v === null || v === undefined || v === '') { cnt++; continue; }
+        cnt++;
+        if(typeof v === 'number' && isFinite(v)) cntNum++;
+        else if(!isNaN(parseFloat(v))) cntNum++;
+      }
+      if(cnt>0 && (cntNum/cnt) > 0.6) meta.numeric.push(h); else meta.categorical.push(h);
     });
-    postDataLoad();
+    document.getElementById('rowCount').innerText = rawData.length;
+    document.getElementById('colCount').innerText = meta.headers.length;
   }
 
-  function postDataLoad(){
-    // populate filter menus (unique values)
-    const types = Array.from(new Set(vendors.map(v=>v.type || 'Unknown'))).sort();
-    const regions = Array.from(new Set(vendors.map(v=>v.region || 'Unknown'))).sort();
-    vendorTypeMenu.innerHTML = types.map((t,i)=>`
-      <div class="form-check"><input class="form-check-input vendor-type-checkbox" type="checkbox" id="vt_${i}" value="${t}" checked>
-      <label class="form-check-label" for="vt_${i}">${t}</label></div>
-    `).join('');
-    regionMenu.innerHTML = regions.map((r,i)=>`
-      <div class="form-check"><input class="form-check-input region-checkbox" type="checkbox" id="rg_${i}" value="${r}" checked>
-      <label class="form-check-label" for="rg_${i}">${r}</label></div>
-    `).join('');
-    // enable export buttons
-    exportCsvBtn.disabled = false;
-    exportXlsxBtn.disabled = false;
-    // update counts
-    rowCountEl.innerText = vendors.length;
-    colCountEl.innerText = vendors.length ? Object.keys(vendors[0]).length : 0;
-    updateFilterCounts();
-    applyFiltersAndRender();
-  }
-
-  function updateFilterCounts(){
-    const vtChecked = document.querySelectorAll('.vendor-type-checkbox:checked').length;
-    const rgChecked = document.querySelectorAll('.region-checkbox:checked').length;
-    vendorTypeCount.innerText = `(${vtChecked})`;
-    regionCount.innerText = `(${rgChecked})`;
-  }
-
-  document.addEventListener('change', (e)=>{
-    if(e.target.matches('.vendor-type-checkbox') || e.target.matches('.region-checkbox')) updateFilterCounts();
-  });
-
-  /***************
-   * Chart.js setup
-   ***************/
-  const ctx = document.getElementById('mainChart').getContext('2d');
-  let mainChart = new Chart(ctx, {
-    type: defaults.chartType,
-    data: {labels:[],datasets:[{label:'Revenue',data:[],backgroundColor:[]}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}
-  });
-
-  function buildColor(i){ const p=["#2563eb","#06b6d4","#f97316","#10b981","#7c3aed","#ef4444","#f59e0b","#0ea5a4"]; return p[i%p.length]; }
-
-  /***************
-   * Map init (Leaflet)
-   ***************/
-  const map = L.map('map',{preferCanvas:true}).setView([22.0,79.0],5);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors'}).addTo(map);
-  let markerLayer = L.layerGroup().addTo(map);
-
-  function renderMapMarkers(list){
-    markerLayer.clearLayers();
-    const pts = [];
-    list.forEach(v=>{
-      if(v.lat==null || v.lng==null) return;
-      const m = L.marker([v.lat,v.lng]);
-      m.bindTooltip(`<strong>${v.name}</strong><br/>${v.type} • ${v.region}`,{direction:'top'});
-      m.on('click', ()=> {
-        L.popup({maxWidth:320}).setLatLng([v.lat,v.lng]).setContent(`
-          <div style="min-width:220px">
-            <strong>${v.name}</strong><br/>
-            <small>${v.type} • ${v.region}</small>
-            <hr style="margin:6px 0"/>
-            ${v.portfolio || '<em>No portfolio provided</em>'}
-          </div>
-        `).openOn(map);
+  // ---------- Filters (sidebar) ----------
+  function buildFilters(){
+    filtersContainer.innerHTML = '';
+    // We'll create groups for first 4 categorical columns (or all if few)
+    const groups = meta.categorical.length ? meta.categorical.slice(0,5) : meta.headers.slice(0,3);
+    groups.forEach(col=>{
+      const wrapper = document.createElement('div');
+      wrapper.className = 'filter-group';
+      const title = document.createElement('div');
+      title.className = 'filter-title';
+      title.innerHTML = `<span>${col}</span><span class="select-all" data-col="${col}">Select All</span>`;
+      wrapper.appendChild(title);
+      // values
+      const vals = Array.from(new Set(rawData.map(r => (r[col] ?? '') + '')).values()).filter(x=>x!=='').sort();
+      const list = document.createElement('div');
+      vals.forEach((v, idx)=>{
+        const id = `f_${col}_${idx}`;
+        const div = document.createElement('div');
+        div.className = 'form-check';
+        div.innerHTML = `<input class="form-check-input filter-checkbox" data-col="${col}" type="checkbox" id="${id}" value="${escapeHtml(v)}" checked>
+                         <label class="form-check-label" for="${id}">${escapeHtml(v)}</label>`;
+        list.appendChild(div);
       });
-      m.addTo(markerLayer);
-      pts.push([v.lat,v.lng]);
-    });
-    if(pts.length) {
-      const bounds = L.latLngBounds(pts);
-      if(bounds.isValid()) map.fitBounds(bounds.pad(0.2));
-      mapStatus.innerText = `${pts.length} pins`;
-    } else {
-      mapStatus.innerText = 'No pins';
-    }
-  }
-
-  /***************
-   * Render table
-   ***************/
-  function renderTable(list){
-    const tb = document.getElementById('dataTableBody');
-    tb.innerHTML = '';
-    if(!list.length){ tb.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No records</td></tr>'; return; }
-    for(const v of list){
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${escapeHtml(v.name)}</td><td>${escapeHtml(v.type)}</td><td>${escapeHtml(v.region)}</td><td>₹ ${Number(v.revenue||0).toLocaleString()}</td><td>${v.lat!=null?v.lat.toFixed(4):''}</td><td>${v.lng!=null?v.lng.toFixed(4):''}</td>`;
-      tb.appendChild(tr);
-    }
-  }
-
-  function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
-  /***************
-   * Apply filters & render chart + map + table
-   ***************/
-  function applyFiltersAndRender(){
-    const selectedTypes = Array.from(document.querySelectorAll('.vendor-type-checkbox:checked')).map(i=>i.value);
-    const selectedRegions = Array.from(document.querySelectorAll('.region-checkbox:checked')).map(i=>i.value);
-    const topN = parseInt(document.getElementById('topN').value || '10',10);
-    const chartType = document.getElementById('chartType').value;
-    const searchQ = (document.getElementById('globalSearch').value || '').toLowerCase().trim();
-
-    let filtered = vendors.filter(v => (selectedTypes.length? selectedTypes.includes(v.type):true) && (selectedRegions.length? selectedRegions.includes(v.region):true));
-    if(searchQ) filtered = filtered.filter(v=> (v.name + ' ' + (v.type||'') + ' ' + (v.region||'')).toLowerCase().includes(searchQ));
-
-    // table
-    renderTable(filtered);
-
-    // map
-    renderMapMarkers(filtered);
-
-    // prepare chart (top N by revenue)
-    const sorted = filtered.slice().sort((a,b)=> (b.revenue||0) - (a.revenue||0)).slice(0, topN);
-    const labels = sorted.map(s=>s.name);
-    const data = sorted.map(s=>s.revenue||0);
-    const colors = sorted.map((_,i)=>buildColor(i));
-
-    // update chart -- destroy & recreate for simple handling of type changes
-    mainChart.destroy();
-    mainChart = new Chart(ctx, {
-      type: chartType === 'pie' ? 'pie' : (chartType === 'line' ? 'line' : 'bar'),
-      data: { labels, datasets: [{ label:'Revenue', data, backgroundColor: colors, borderColor: colors }]},
-      options: {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:chartType==='pie'}},scales: chartType==='pie' ? {} : { y:{beginAtZero:true}}}
+      wrapper.appendChild(list);
+      filtersContainer.appendChild(wrapper);
     });
 
-    // update counts
-    rowCountEl.innerText = vendors.length;
-    colCountEl.innerText = vendors.length ? Object.keys(vendors[0]).length : 0;
+    // wire select all and instant apply
+    filtersContainer.querySelectorAll('.select-all').forEach(sa=>{
+      sa.addEventListener('click', (ev)=>{
+        const col = sa.dataset.col;
+        const cbs = Array.from(document.querySelectorAll(`.filter-checkbox[data-col="${col}"]`));
+        const allChecked = cbs.every(cb => cb.checked);
+        cbs.forEach(cb => cb.checked = !allChecked);
+        applyFilters();
+      });
+    });
+
+    // instant apply on change
+    filtersContainer.querySelectorAll('.filter-checkbox').forEach(cb => cb.addEventListener('change', ()=> applyFilters()));
   }
 
-  applyFiltersBtn.addEventListener('click', applyFiltersAndRender);
+  function getActiveFilterValuesFor(col){
+    return Array.from(document.querySelectorAll(`.filter-checkbox[data-col="${col}"]:checked`)).map(i => i.value);
+  }
 
-  clearFiltersBtn.addEventListener('click', ()=>{
-    document.querySelectorAll('.vendor-type-checkbox, .region-checkbox').forEach(cb => cb.checked = true);
+  function resetAllFilters(){
+    const cbs = Array.from(document.querySelectorAll('.filter-checkbox'));
+    cbs.forEach(cb => cb.checked = true);
     document.getElementById('globalSearch').value = '';
-    document.getElementById('topN').value = 10;
-    document.getElementById('chartType').value = 'bar';
-    updateFilterCounts();
-    applyFiltersAndRender();
-  });
+  }
 
-  // debounce global search
-  let _gdeb;
-  document.getElementById('globalSearch').addEventListener('input', ()=>{
-    clearTimeout(_gdeb);
-    _gdeb = setTimeout(()=> applyFiltersAndRender(), 350);
-  });
+  // ---------- Apply filters ----------
+  let _fdeb;
+  function applyFiltersDebounced(){ clearTimeout(_fdeb); _fdeb = setTimeout(()=> applyFilters(), 300); }
 
-  // table search client-side
-  document.getElementById('tableSearch').addEventListener('input', (e)=>{
-    const q = e.target.value.trim().toLowerCase();
-    Array.from(document.querySelectorAll('#dataTableBody tr')).forEach(tr=>{
-      tr.style.display = tr.innerText.toLowerCase().includes(q) ? '' : 'none';
+  function applyFilters(){
+    // construct filter map from visible filter groups
+    const groups = Array.from(document.querySelectorAll('.filter-group .filter-title span:first-child')).map(s=>s.textContent);
+    let filtered = rawData.slice();
+
+    groups.forEach(col=>{
+      const active = getActiveFilterValuesFor(col);
+      if(active.length && active.length !== document.querySelectorAll(`.filter-checkbox[data-col="${col}"]`).length){
+        filtered = filtered.filter(r => active.includes((r[col] ?? '') + ''));
+      }
     });
-  });
 
-  /***************
-   * Export CSV / XLSX
-   ***************/
+    // global search
+    const q = (globalSearch.value || '').toLowerCase().trim();
+    if(q){
+      filtered = filtered.filter(r => Object.values(r).some(v => (v===null||v===undefined)?false: (''+v).toLowerCase().includes(q)));
+    }
+
+    viewData = filtered;
+    renderTable();
+    renderChart();
+    renderMap();
+  }
+
+  // ---------- Chart ----------
+  function renderChart(){
+    if(!viewData || !viewData.length) {
+      if(chart){ chart.destroy(); chart=null; }
+      return;
+    }
+    const chartType = chartSelect.value;
+    const top = Math.max(1, Number(topN.value) || 10);
+    // pick category and numeric field heuristically
+    const cat = meta.categorical[0] || meta.headers[0];
+    const num = meta.numeric[0] || meta.headers.find(h => h!==cat) || meta.headers[0];
+
+    // aggregate by category
+    const agg = {};
+    viewData.forEach(r => {
+      const k = (r[cat] ?? 'Unknown') + '';
+      const v = Number(r[num]) || 0;
+      agg[k] = (agg[k] || 0) + v;
+    });
+    const entries = Object.entries(agg).sort((a,b)=>b[1]-a[1]).slice(0, top);
+    const labels = entries.map(e=>e[0]);
+    const values = entries.map(e=>e[1]);
+    const palette = ['#2563eb','#06b6d4','#f97316','#10b981','#7c3aed','#ef4444','#f59e0b','#0ea5a4','#8b5cf6','#e11d48'];
+    const colors = labels.map((_,i)=>palette[i%palette.length]);
+
+    const ctx = document.getElementById('mainChart').getContext('2d');
+    if(chart){ try{ chart.destroy(); }catch(e){} chart=null; }
+    // Chart.js option mapping for the requested types
+    let cfgType = 'bar';
+    let cfgOptions = { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}} , scales:{ y:{beginAtZero:true} } };
+    let cfgData = {};
+
+    switch(chartType){
+      case 'bar':
+        cfgType='bar';
+        cfgData = { labels, datasets:[{ label:num, data:values, backgroundColor:colors }]};
+        break;
+      case 'horizontalBar':
+        cfgType='bar';
+        cfgOptions.scales = { x:{beginAtZero:true} , y:{beginAtZero:false} };
+        cfgOptions.indexAxis = 'y';
+        cfgData = { labels, datasets:[{ label:num, data:values, backgroundColor:colors }]};
+        break;
+      case 'line':
+        cfgType='line';
+        cfgData = { labels, datasets:[{ label:num, data:values, borderColor:colors[0], backgroundColor:'rgba(0,0,0,0)', fill:false }]};
+        break;
+      case 'area':
+        cfgType='line';
+        cfgData = { labels, datasets:[{ label:num, data:values, borderColor:colors[0], backgroundColor:colors[0], fill:true }]};
+        break;
+      case 'pie':
+        cfgType='pie';
+        cfgData = { labels, datasets:[{ data:values, backgroundColor:colors }]};
+        cfgOptions.plugins.legend.display = true;
+        break;
+      case 'doughnut':
+        cfgType='doughnut';
+        cfgData = { labels, datasets:[{ data:values, backgroundColor:colors }]};
+        cfgOptions.plugins.legend.display = true;
+        break;
+      case 'polarArea':
+        cfgType='polarArea';
+        cfgData = { labels, datasets:[{ data:values, backgroundColor:colors }]};
+        cfgOptions.plugins.legend.display = true;
+        break;
+      case 'radar':
+        cfgType='radar';
+        cfgData = { labels, datasets:[{ label:num, data:values, backgroundColor:colors[0], borderColor:colors[0], fill:true }]};
+        cfgOptions.plugins.legend.display = false;
+        break;
+      case 'bubble':
+        // create bubble points: use values as r, and spread them across x
+        cfgType='bubble';
+        cfgData = { datasets: labels.map((l,i)=>({ label:l, data:[{ x:i+1, y:values[i], r: Math.max(4, Math.sqrt(values[i]) / 20 ) }], backgroundColor:colors[i] })) };
+        cfgOptions.plugins.legend.display = false;
+        break;
+      case 'scatter':
+        cfgType='scatter';
+        cfgData = { datasets:[{ label:num, data: labels.map((l,i)=> ({ x:i+1, y: values[i] })), backgroundColor:colors[0] }]};
+        cfgOptions.plugins.legend.display = false;
+        cfgOptions.scales = { x:{ type:'linear', position:'bottom' }, y:{ beginAtZero:true } };
+        break;
+    }
+
+    chart = new Chart(ctx, { type:cfgType, data:cfgData, options:cfgOptions });
+    downloadChart.disabled = false;
+  }
+
+  // ---------- Map ----------
+  function initMap(){
+    map = L.map('map',{ preferCanvas:true }).setView([22.0,79.0],5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap' }).addTo(map);
+    markerLayer = L.layerGroup().addTo(map);
+  }
+
+  function renderMap(){
+    markerLayer.clearLayers();
+    if(!viewData || !viewData.length){ mapStatus.textContent='No pins'; return; }
+    // prefer lat/lng columns
+    const latKey = meta.headers.find(h=>/lat|latitude/i.test(h));
+    const lngKey = meta.headers.find(h=>/lon|lng|longitude/i.test(h));
+    if(latKey && lngKey){
+      viewData.forEach(r=>{
+        const lat = parseFloat(r[latKey]), lng = parseFloat(r[lngKey]);
+        if(isFinite(lat) && isFinite(lng)){
+          addMarker(lat, lng, r);
+        }
+      });
+      mapStatus.textContent = markerLayer.getLayers().length ? `${markerLayer.getLayers().length} pins` : 'No pins';
+      fitMap();
+      return;
+    }
+    // fallback: geocode a place field (limited)
+    const placeKey = meta.headers.find(h=>/city|town|village|state|district|place|location/i.test(h));
+    if(!placeKey){ mapStatus.textContent='No location fields'; return; }
+    mapStatus.textContent = 'Geocoding...';
+    // throttle geocoding and limit to 40 unique
+    const unique = Array.from(new Set(viewData.map(r=> (r[placeKey] ?? '')+ '').filter(Boolean))).slice(0,40);
+    unique.length ? geocodeAndPlot(unique, placeKey) : mapStatus.textContent='No place values';
+  }
+
+  async function geocodeAndPlot(unique, placeKey){
+    const geos = {};
+    for(let i=0;i<unique.length;i++){
+      const q = unique[i];
+      try{
+        await delay(650); // be polite to nominatim
+        const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q + ' India')}`, { headers:{ 'Accept-Language':'en' }});
+        if(!resp.ok) continue;
+        const arr = await resp.json();
+        if(arr && arr[0]) geos[q] = { lat: parseFloat(arr[0].lat), lon: parseFloat(arr[0].lon) };
+      }catch(e){ console.warn('geocode failed', e); }
+    }
+    viewData.forEach(r=>{
+      const place = (r[placeKey] ?? '') + '';
+      const g = geos[place];
+      if(g) addMarker(g.lat, g.lon, r);
+    });
+    mapStatus.textContent = markerLayer.getLayers().length ? `${markerLayer.getLayers().length} pins` : 'No pins';
+    fitMap();
+  }
+
+  function addMarker(lat, lng, row){
+    const html = Object.entries(row).map(([k,v])=>`<div style="font-size:.9rem"><strong>${escapeHtml(k)}:</strong> ${escapeHtml(v)}</div>`).join('');
+    const m = L.marker([lat, lng]);
+    m.bindTooltip(`${escapeHtml(row[meta.headers[0]] || '')}`, { direction:'top' });
+    m.on('click', ()=> L.popup({ maxWidth:360 }).setLatLng([lat,lng]).setContent(html).openOn(map));
+    markerLayer.addLayer(m);
+  }
+  function fitMap(){ if(!markerLayer || !markerLayer.getLayers().length) return; const group = L.featureGroup(markerLayer.getLayers()); map.fitBounds(group.getBounds().pad(0.15)); }
+
+  function delay(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+  // ---------- Table ----------
+  function renderTable(){
+    // header from meta.headers
+    tableHeader.innerHTML = '';
+    const headers = meta.headers.length ? meta.headers : Object.keys(viewData[0] || {});
+    headers.forEach(h => {
+      const th = document.createElement('th'); th.textContent = h; tableHeader.appendChild(th);
+    });
+    // rows with pagination (client-side)
+    const pageSize = Number(rowsPerPage.value) || 25;
+    const q = (tableSearch.value || '').toLowerCase().trim();
+    const filtered = (viewData || []).filter(r => {
+      if(!q) return true;
+      return Object.values(r).some(v => (v===null||v===undefined)?false: (''+v).toLowerCase().includes(q));
+    });
+    tableBody.innerHTML = '';
+    if(!filtered.length){ tableBody.innerHTML = '<tr><td colspan="' + Math.max(1,headers.length) + '" class="text-center text-muted py-3">No records</td></tr>'; return; }
+    filtered.slice(0, pageSize).forEach(r => {
+      const tr = document.createElement('tr');
+      headers.forEach(h => {
+        const td = document.createElement('td');
+        td.innerHTML = escapeHtml(r[h] ?? '');
+        tr.appendChild(td);
+      });
+      tableBody.appendChild(tr);
+    });
+  }
+
+  // ---------- Utilities ----------
+  function escapeHtml(s){ if(s===null||s===undefined) return ''; return (''+s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+
+  // ---------- Exports ----------
   function exportCSV(){
-    if(!vendors.length) return alert('No data to export');
-    const headers = ['Vendor','Type','Region','Revenue','Latitude','Longitude'];
-    const rows = vendors.map(v=>[v.name,v.type,v.region,v.revenue||'',v.lat||'',v.lng||'']);
-    const lines = [headers, ...rows].map(r => r.map(cell => `"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\n');
-    const blob = new Blob([lines], {type:'text/csv;charset=utf-8;'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'vendors_export.csv';
-    a.click();
+    if(!viewData.length) return alert('No data');
+    const hdr = meta.headers;
+    const lines = [hdr.join(',')].concat(viewData.map(r => hdr.map(h=> `"${String(r[h] ?? '').replace(/"/g,'""')}"`).join(',')));
+    const blob = new Blob([lines.join('\n')], { type:'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'export.csv'; a.click();
   }
+
   function exportXLSX(){
-    if(!vendors.length) return alert('No data to export');
-    const ws = XLSX.utils.json_to_sheet(vendors.map(v=>({
-      Vendor:v.name, Type:v.type, Region:v.region, Revenue:v.revenue, Latitude:v.lat, Longitude:v.lng
-    })));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Vendors');
-    XLSX.writeFile(wb, 'vendors_export.xlsx');
+    if(!viewData.length) return alert('No data');
+    const ws = XLSX.utils.json_to_sheet(viewData);
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Export'); XLSX.writeFile(wb, 'export.xlsx');
   }
-  exportCsvBtn.addEventListener('click', exportCSV);
-  exportXlsxBtn.addEventListener('click', exportXLSX);
 
-  /***************
-   * Download chart image
-   ***************/
-  document.getElementById('downloadChartBtn').addEventListener('click', ()=>{
-    const a = document.createElement('a');
-    a.href = document.getElementById('mainChart').toDataURL('image/png',1);
-    a.download = 'chart.png';
-    a.click();
-  });
-
-  /***************
-   * Print dashboard (html2canvas + jspdf)
-   ***************/
-  printBtn.addEventListener('click', async ()=>{
-    const main = document.querySelector('main');
-    const canvas = await html2canvas(main, {scale:1.5, useCORS:true});
-    const img = canvas.toDataURL('image/jpeg',0.95);
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF('landscape', 'pt', 'a4');
-    const w = pdf.internal.pageSize.getWidth();
-    const h = (canvas.height * w) / canvas.width;
-    pdf.addImage(img, 'JPEG', 10, 10, w-20, h-20);
-    pdf.save('dashboard_print.pdf');
-  });
-
-  /***************
-   * Fullscreen handlers & map resize
-   ***************/
+  // ---------- Fullscreen & Chart download ----------
   function toggleFullscreen(el){
     if(!document.fullscreenElement){
       el.requestFullscreen && el.requestFullscreen();
@@ -517,52 +563,32 @@
       document.exitFullscreen && document.exitFullscreen();
     }
   }
-  document.getElementById('chartFullscreen').addEventListener('click', ()=> toggleFullscreen(document.getElementById('chartColumn')));
-  document.getElementById('mapFullscreen').addEventListener('click', ()=> {
-    toggleFullscreen(document.getElementById('mapColumn'));
-    setTimeout(()=> map.invalidateSize(), 400);
-  });
+  function downloadChartImage(){
+    if(!chart) return;
+    const a = document.createElement('a');
+    a.href = chart.toBase64Image();
+    a.download = 'chart.png';
+    a.click();
+  }
 
-  // ensure map resized after fullscreen change
-  document.addEventListener('fullscreenchange', ()=> { setTimeout(()=> map.invalidateSize(), 250); });
+  // ---------- Demo dataset (initial) ----------
+  function loadDemoDataset(){
+    rawData = [
+      { Vendor:'Asha Mart', Type:'Retail', Region:'North', Revenue:120000, Latitude:28.6139, Longitude:77.2090, Portfolio:'Retail chain with 5 outlets' },
+      { Vendor:'Kala Wholesalers', Type:'Wholesale', Region:'West', Revenue:300000, Latitude:19.0760, Longitude:72.8777, Portfolio:'Bulk garment supplier' },
+      { Vendor:'Suryan Services', Type:'Services', Region:'South', Revenue:90000, Latitude:13.0827, Longitude:80.2707, Portfolio:'Logistics & consulting' },
+      { Vendor:'Greenfield Trade', Type:'Wholesale', Region:'North', Revenue:210000, Latitude:28.4595, Longitude:77.0266, Portfolio:'Agriculture wholesale' },
+      { Vendor:'Bengal Retail', Type:'Retail', Region:'East', Revenue:150000, Latitude:22.5726, Longitude:88.3639, Portfolio:'Supermarket chain' },
+      { Vendor:'Coastal Vendors', Type:'Services', Region:'South', Revenue:60000, Latitude:9.9312, Longitude:76.2673, Portfolio:'Local services' }
+    ];
+    postLoad();
+  }
 
-  /***************
-   * Theme toggle
-   ***************/
-  themeToggle.addEventListener('click', ()=>{
-    document.body.classList.toggle('theme-dark');
-  });
+  // ---------- Helpers ----------
+  function postLoad(){ detectMeta(); buildFilters(); resetAllFilters(); applyFilters(); exportCsv.disabled=false; exportXlsx.disabled=false; }
 
-  /***************
-   * Reset view
-   ***************/
-  document.getElementById('resetBtn').addEventListener('click', ()=>{
-    vendors = [];
-    document.getElementById('dataTableBody').innerHTML = '';
-    vendorTypeMenu.innerHTML = '';
-    regionMenu.innerHTML = '';
-    updateFilterCounts();
-    exportCsvBtn.disabled = true;
-    exportXlsxBtn.disabled = true;
-    rowCountEl.innerText = 0; colCountEl.innerText = 0; mapStatus.innerText = 'Idle';
-    mainChart.destroy();
-    mainChart = new Chart(ctx, {type:'bar',data:{labels:[],datasets:[{label:'Revenue',data:[]}]},options:{responsive:true,maintainAspectRatio:false}});
-    markerLayer.clearLayers();
-  });
-
-  /***************
-   * Utility: escape HTML when adding rows (already used)
-   ***************/
-
-  /***************
-   * Init small UX: apply when inputs exist
-   ***************/
-  // basic init: disable export until loaded
-  exportCsvBtn.disabled = true;
-  exportXlsxBtn.disabled = true;
-
-  // Autoload demo on first open for instant visuals
-  loadDemo();
+  // ---------- Helpers for upload UI (not shown) ----------
+  // Debounce for apply filters already implemented
 
   </script>
 </body>
