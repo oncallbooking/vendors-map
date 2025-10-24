@@ -1,0 +1,86 @@
+/* ===== Sachida's RDSO Vendor Dashboard Styles ===== */
+body {
+  font-family: "Inter", "Segoe UI", sans-serif;
+  background-color: #f8f9fa;
+  color: #333;
+}
+
+#sidebar {
+  width: 280px;
+  min-height: 100vh;
+  position: sticky;
+  top: 0;
+}
+
+#app-root {
+  height: 100vh;
+  overflow: hidden;
+}
+
+main {
+  overflow-y: auto;
+  background: #fdfdfd;
+}
+
+/* Sidebar adjustments */
+#sidebar h4 {
+  font-weight: 600;
+  color: #004085;
+}
+
+#sidebar hr {
+  border-color: #ddd;
+}
+
+/* Upload modal drop zone */
+#dropZone {
+  transition: background-color 0.25s, border-color 0.25s;
+  cursor: pointer;
+}
+
+#dropZone.dragover {
+  background-color: #e8f5e9;
+  border-color: #28a745;
+}
+
+/* Chart area */
+#chartArea {
+  text-align: center;
+}
+
+canvas {
+  width: 100%;
+}
+
+/* Table styling */
+#dataTableContainer table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#dataTableContainer th,
+#dataTableContainer td {
+  border: 1px solid #ddd;
+  padding: 6px 8px;
+}
+
+#dataTableContainer th {
+  background: #f1f3f5;
+  font-weight: 600;
+}
+
+#dataTableContainer tr:nth-child(even) {
+  background: #fafafa;
+}
+
+/* Map */
+#map {
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+/* Buttons */
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
