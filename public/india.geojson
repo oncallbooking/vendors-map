@@ -1,0 +1,21 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "STATE_NAME": "Maharashtra", "ST_CODE": "27" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[72.0, 18.5],[73.5, 18.5],[73.5,20.5],[72.0,20.5],[72.0,18.5]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "STATE_NAME": "Gujarat", "ST_CODE": "24" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[70.0, 20.0],[71.8,20.0],[71.8,22.0],[70.0,22.0],[70.0,20.0]]]
+      }
+    }
+  ]
+}
